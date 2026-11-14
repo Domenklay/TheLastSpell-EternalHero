@@ -145,7 +145,11 @@ namespace EternalHero.Plugin
             switch (id)
             {
                 case "Health": return "HealthTotal";
-                case "SkillRange": return "Range";
+                case "Armor": return "ArmorTotal";
+                case "MagicDamage": return "MagicalDamage";
+                case "MovePoints": return "MovePointsTotal";
+                case "ActionPoints": return "ActionPointsTotal";
+                case "SkillRange": return "SkillRangeModifier";
                 default: return id;
             }
         }
