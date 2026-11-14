@@ -20,6 +20,7 @@ namespace EternalHero.Plugin
         private ProfileStore store;
         private ProgressionService progression;
         private HeroScreen screen;
+        private RunRewards runRewards;
         private ConfigEntry<bool> applyBonuses;
         private ConfigEntry<bool> debugRewards;
         private ConfigEntry<bool> openOnStartup;
@@ -46,6 +47,7 @@ namespace EternalHero.Plugin
                     "Open the native Unity character creator on game startup.");
                 store = new ProfileStore(Path.Combine(Paths.ConfigPath, "EternalHero", "profile.json"));
                 progression = new ProgressionService(store.Load());
+                runRewards = new RunRewards(progression);
                 // One free point for initial testing, once per profile. Old v0.3 gift won't be doubled.
                 if (!Profile.StarterEssenceGranted)
                 {
@@ -69,6 +71,14 @@ namespace EternalHero.Plugin
                     Logger.LogInfo("Eternal Hero static CreateStartUnits hook installed.");
                 }
                 else Logger.LogWarning("CreateStartUnits missing on this game version.");
+
+                var nightXp = AccessTools.Method("TheLastStand.Manager.Unit.PlayableUnitManager:DistributeDailyExperience");
+                if (nightXp != null)
+                {
+                    harmony.Patch(nightXp, postfix: new HarmonyMethod(
+                        AccessTools.Method(typeof(Plugin), nameof(AfterNightExperience))));
+                    Logger.LogInfo("Eternal Hero night XP hook installed.");
+                }
 
                 var customization = AccessTools.Method(
                     "TheLastStand.View.PlayableUnitCustomisation.PlayableUnitCustomisationPanel:OnConfirmButtonClicked");
@@ -114,8 +124,50 @@ namespace EternalHero.Plugin
                 yield break;
             }
             Logger.LogInfo("Eternal Hero: first unit discovered " + currentHero.GetType().FullName);
+            // Called only when the game generates the starting roster, not during ordinary saved-game reloads.
+            // A new independent GUID cannot collide with the previous run or depend on the hero name.
+            string newRunId = Guid.NewGuid().ToString("N");
+            if (runRewards.Begin(newRunId))
+            {
+                Logger.LogInfo("Eternal Hero: created persistent run " + newRunId);
+                SaveProfile();
+            }
             ApplyCurrentHero();
             screen?.NotifyHero();
+        }
+
+        private static void AfterNightExperience()
+        {
+            if (Instance != null) Instance.RewardCompletedNight();
+        }
+
+        private void RewardCompletedNight()
+        {
+            try
+            {
+                if (runRewards == null || string.IsNullOrWhiteSpace(Profile?.CurrentRunId) ||
+                    Profile.RunFinished) return;
+                object game = GameBridge.Singleton("TheLastStand.Manager.GameManager");
+                object dayObj = GameBridge.Get(game, "DayNumber");
+                if (dayObj == null)
+                {
+                    Logger.LogWarning("Eternal Hero: cannot read DayNumber for night reward");
+                    return;
+                }
+                int day = Convert.ToInt32(dayObj);
+                string token = "run:" + Profile.CurrentRunId + ":game-day:" + day;
+                if (Profile.ClaimedRewardIds.Contains(token)) return;
+                int nextNight = Profile.LastCompletedNight + 1;
+                if (runRewards.NightSurvived(nextNight))
+                {
+                    Profile.ClaimedRewardIds.Add(token);
+                    SaveProfile();
+                    Logger.LogInfo("Eternal Hero: rewarded survived night " + nextNight +
+                        ", game day " + day + "; total essence=" + Profile.AvailableEssence);
+                    screen?.Notify("Пережита ночь " + nextNight + ": получен постоянный опыт");
+                }
+            }
+            catch (Exception ex) { Logger.LogError("Eternal Hero night reward: " + ex); }
         }
 
         private static void AfterNativeAppearanceSaved(object __instance)
