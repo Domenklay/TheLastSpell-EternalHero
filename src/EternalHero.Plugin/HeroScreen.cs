@@ -28,6 +28,7 @@ namespace EternalHero.Plugin
         private RectTransform rightPane, portraitSlot;
         private Image portraitImage;
         private int tab;
+        private readonly List<Image> tabGraphics = new List<Image>();
         private string status = "";
         private float lastResolve;
         private const float W = 1430f, H = 810f;
@@ -249,8 +250,9 @@ namespace EternalHero.Plugin
             for (int i=0;i<tabs.Length;i++)
             {
                 int k=i;
-                Action(win.transform,"Tab-"+i,411 + i*196,118,190,48,tabs[i],
+                var tabButton=Action(win.transform,"Tab-"+i,411 + i*196,118,190,48,tabs[i],
                     () => { tab=k; Rebuild(); }, i==tab);
+                tabGraphics.Add(tabButton.GetComponent<Image>());
             }
             var right = Image(win.transform,"Contents",410,182,995,600,slate);
             rightPane = right.GetComponent<RectTransform>();
@@ -287,6 +289,9 @@ namespace EternalHero.Plugin
         public void Rebuild()
         {
             if (rightPane == null) return;
+            for(int i=0;i<tabGraphics.Count;i++)
+                if(tabGraphics[i]) tabGraphics[i].color =
+                    i==tab ? new Color(.38f,.26f,.13f) : slate;
             foreach (Transform child in rightPane.Cast<Transform>().ToArray())
                 UnityEngine.Object.Destroy(child.gameObject);
             var profile=mod.Profile;
@@ -326,6 +331,17 @@ namespace EternalHero.Plugin
                 selected=(selected-1+races.Count)%races.Count;p.HeroRaceId=races[selected];Save();Rebuild();
             });
             Label(rightPane,GameBridge.RaceName(p.HeroRaceId),115,286,350,55,25,parchment,TextAnchor.MiddleCenter,true);
+            var raceDefs=GameBridge.StaticGet("TheLastStand.Database.Unit.PlayableUnitDatabase","RaceDefinitions")
+                as System.Collections.IDictionary;
+            if (raceDefs != null && raceDefs.Contains(p.HeroRaceId))
+            {
+                var icon = GameBridge.Get(raceDefs[p.HeroRaceId],"RaceSprite") as Sprite;
+                if(icon != null)
+                {
+                    var logo=Image(rightPane,"InGameRaceIcon",210,231,92,51,Color.white,icon);
+                    logo.GetComponent<Image>().preserveAspect=true;
+                }
+            }
             Action(rightPane,"NextRace",471,288,70,52,"▶",()=>{
                 selected=(selected+1)%races.Count;p.HeroRaceId=races[selected];Save();Rebuild();
             });
@@ -461,6 +477,17 @@ namespace EternalHero.Plugin
             scroll.content=rt;
             scroll.viewport=view.GetComponent<RectTransform>();
             scroll.scrollSensitivity=33;
+            var rail=Image(view.transform,"ScrollTrack",w-20,5,12,h-10,new Color(.18f,.17f,.17f,1f));
+            rail.GetComponent<Image>().raycastTarget=true;
+            var handle=Image(rail.transform,"ScrollHandle",0,0,12,50,gold);
+            handle.GetComponent<Image>().raycastTarget=true;
+            var bar=rail.AddComponent<Scrollbar>();
+            bar.handleRect=handle.GetComponent<RectTransform>();
+            bar.direction=Scrollbar.Direction.BottomToTop;
+            bar.value=1f;
+            scroll.verticalScrollbar=bar;
+            scroll.verticalScrollbarVisibility=ScrollRect.ScrollbarVisibility.Permanent;
+            scroll.verticalScrollbarSpacing=0;
             return rt;
         }
 
