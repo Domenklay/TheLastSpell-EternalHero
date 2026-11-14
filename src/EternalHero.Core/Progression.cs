@@ -24,6 +24,8 @@ namespace EternalHero.Core
         [DataMember] public int BossesDefeated { get; set; }
         [DataMember] public bool RunFinished { get; set; }
         [DataMember] public string PortraitHint { get; set; } = "";
+        [DataMember] public Dictionary<string, string> Appearance { get; set; } =
+            new Dictionary<string, string>();
         [DataMember] public bool FirstRunGiftClaimed { get; set; }
         [DataMember] public Dictionary<string, int> Ranks { get; set; } = new Dictionary<string, int>();
         [DataMember] public HashSet<string> ClaimedRewardIds { get; set; } = new HashSet<string>();
