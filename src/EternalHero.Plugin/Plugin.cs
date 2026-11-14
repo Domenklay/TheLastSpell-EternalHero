@@ -151,6 +151,8 @@ namespace EternalHero.Plugin
                 Logger.LogInfo("Identified starting hero; fixed name applied: " + named +
                     "; type=" + hero.GetType().FullName);
                 Logger.LogInfo("Hero stat bridge: " + HeroRuntime.DiagnosticStatSurface(hero));
+                Logger.LogInfo("Hero ability bridge: " + GameApiProbe.HeroAbilityMethods(hero));
+                Logger.LogInfo(GameApiProbe.SkillDefinitions());
                 if (experimentalStatInjection.Value)
                 {
                     int applied = HeroRuntime.TryApplyBonuses(hero, progression.CalculatedStatBonuses(), Logger);
