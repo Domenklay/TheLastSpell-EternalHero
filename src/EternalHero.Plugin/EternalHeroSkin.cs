@@ -10,13 +10,14 @@ namespace EternalHero.Plugin
     {
         private readonly ManualLogSource log;
         private Texture2D panel, panelLight, button, hover, selected, goldLine, progressTrack, progressFill;
-        private GUIStyle windowStyle, buttonStyle, selectedStyle, labelStyle, headerStyle, titleStyle, tinyStyle, redStyle;
+        private GUIStyle windowStyle, cardStyle, buttonStyle, selectedStyle, labelStyle, headerStyle, titleStyle, tinyStyle, redStyle;
         private Sprite gamePanel;
         private bool initialized, loggedSpriteProbe;
         private float nextSpriteScan;
         private bool useGameSprites;
 
         public GUIStyle Window { get { Ensure(); return windowStyle; } }
+        public GUIStyle Card { get { Ensure(); return cardStyle; } }
         public GUIStyle Button { get { Ensure(); return buttonStyle; } }
         public GUIStyle Selected { get { Ensure(); return selectedStyle; } }
         public GUIStyle Label { get { Ensure(); return labelStyle; } }
@@ -80,6 +81,12 @@ namespace EternalHero.Plugin
                 padding = new RectOffset(12, 12, 28, 12),
                 fontSize = 16,
                 fontStyle = FontStyle.Bold
+            };
+            cardStyle = new GUIStyle(GUI.skin.box) {
+                normal = { background = panelLight, textColor = textColor },
+                padding = new RectOffset(9, 9, 7, 7),
+                margin = new RectOffset(4, 4, 4, 4),
+                border = new RectOffset(3, 3, 3, 3)
             };
             buttonStyle = new GUIStyle(GUI.skin.button)
             {
