@@ -98,7 +98,19 @@ namespace EternalHero.Plugin
             public string Id;
             public string Name;
             public int Cost;
+            public string Description = "";
             public List<string> ForbiddenRaces = new List<string>();
+        }
+
+        public static string RaceName(string id)
+        {
+            var definitions = StaticGet(DatabaseType, "RaceDefinitions") as IDictionary;
+            if (id != null && definitions != null && definitions.Contains(id))
+            {
+                var localized = Get(definitions[id], "Name")?.ToString();
+                if (!string.IsNullOrWhiteSpace(localized)) return localized;
+            }
+            return id ?? "";
         }
 
         public static List<TraitOption> Traits()
@@ -109,8 +121,23 @@ namespace EternalHero.Plugin
             foreach (DictionaryEntry e in defs)
             {
                 if (!(e.Key is string id)) continue;
-                var trait = new TraitOption { Id = id, Name = id };
+                string localizedName = Get(e.Value, "Name")?.ToString();
+                var trait = new TraitOption { Id = id,
+                    Name = string.IsNullOrWhiteSpace(localizedName) ? id : localizedName };
                 try { trait.Cost = Convert.ToInt32(Get(e.Value, "Cost") ?? 0); } catch { }
+                var modifiers = Get(e.Value, "StatModifiers") as IEnumerable;
+                if (modifiers != null)
+                {
+                    var statDescriptions = new List<string>();
+                    foreach (object modifier in modifiers)
+                    {
+                        var stat = Get(modifier, "Stat")?.ToString();
+                        var value = Get(modifier, "Value");
+                        if (stat != null && value != null)
+                            statDescriptions.Add(stat + " " + value);
+                    }
+                    trait.Description = string.Join(", ", statDescriptions.Take(3).ToArray());
+                }
                 var forbidden = Get(e.Value, "RaceIncompatibilities") as IEnumerable;
                 if (forbidden != null)
                     foreach (object race in forbidden) if (race != null) trait.ForbiddenRaces.Add(race.ToString());
