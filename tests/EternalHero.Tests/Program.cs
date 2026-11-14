@@ -61,6 +61,25 @@ internal static class Program
             Check(appearance.Appearance["self/Gender"] == "Female", "appearance markers survive save and load");
             Check(appearance.HeroName == "Альтаир", "hero name survives save and load");
             Check(appearance.RunsStarted == 2, "run identity survives appearance save");
+            appearance.HeroName = "Кайден";
+            appearance.HeroRaceId = "Dwarf";
+            appearance.HeroGender = "Female";
+            appearance.HeroFaceId = "FaceA";
+            appearance.PortraitCode = "TEST-CODE";
+            appearance.CreationConfirmed = true;
+            appearance.StarterEssenceGranted = true;
+            appearance.SelectedTraits.Add("Test-Existing-Trait");
+            store.Save(appearance);
+            var recovered = new ProgressionService(store.Load());
+            Check(recovered.Profile.HeroName == "Кайден", "creator saves the chosen name");
+            Check(recovered.Profile.HeroRaceId == "Dwarf", "creator saves race selection");
+            Check(recovered.Profile.HeroGender == "Female", "creator saves gender selection");
+            Check(recovered.Profile.HeroFaceId == "FaceA", "creator saves face ID");
+            Check(recovered.Profile.PortraitCode == "TEST-CODE", "creator saves game portrait code");
+            Check(recovered.Profile.CreationConfirmed, "creator save completed flag persists");
+            Check(recovered.Profile.StarterEssenceGranted, "free starter essence flag persists");
+            Check(recovered.Profile.SelectedTraits.Contains("Test-Existing-Trait"), "trait loadout survives reload");
+
             Console.WriteLine("ALL PROGRESSION TESTS PASSED");
         }
         finally
