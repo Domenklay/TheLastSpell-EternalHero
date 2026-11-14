@@ -1,30 +1,35 @@
-# Eternal Hero: Development Roadmap
+# Eternal Hero — roadmap после v0.4
 
-## Requirements
-- A recurring protagonist takes the first starting roster slot.
-- Normal levels reset between runs; permanent upgrades do not.
-- Any vanilla weapon is usable.
-- Permanently stronger than normal recruits via extra stats, vanilla traits/perks and weapon-independent skills.
+## Подключено в коде
+- [x] Отказ от OnGUI — Unity UGUI Canvas с вводом имени, переключателями расы и пола
+- [x] Русский интерфейс и имена существующих черт/рас из локализации игры
+- [x] Настоящие расовые иконки и портрет ГГ, если загружены
+- [x] Кнопка оригинального редактора персонажа (работает с созданным героем)
+- [x] Сохранение имени, расы, пола, кода игрового портрета и набора черт
+- [x] Исправление статического Harmony-хука создания стартовой команды
+- [x] Применение профиля к первому созданному герою и выдача выбранных черт
+- [x] Тестовое 1 очко эссенции один раз на профиль
+- [x] Реальные названия игровых статов в обработчике бонусов
+- [x] Три определения специальных навыков и механизм выдачи через NativeSkills
+- [x] Перехват начисления опыта за ночь и отдельный GUID забега
+- [x] Распознавание первого героя при загрузке сохранения, без повторного начисления статов
+- [x] CI собирает DLL и проверяет данные профиля
 
-## Implemented and unit-tested
-- [x] Profile saving, backups, existing save compatibility
-- [x] Five metaprogression branches with 17 ranked upgrades
-- [x] Dark game-like UI, tabs, RPG progress bar, optional in-game sprite reuse
-- [x] Starting roster hook, best-effort capture/restore of identity properties
-- [x] First-character one-time gift: +100 XP
-- [x] Run reward ledger for night/boss/win/loss, duplicate protection (standalone tests)
-- [x] Three XML skill definitions and Russian localization for optional TLS.ModKit
-- [x] Diagnostics for game stat/trait/perk/skill methods, plus build CI
+## Требует проверки в запущенной The Last Spell
+- [ ] Подтвердить появление первого героя с сохранённой расой и чертами на текущем билде игры
+- [ ] Подтвердить восстановление настоящего портрета после нового забега
+- [ ] Подтвердить применение характеристик без повторного начисления после сохранения/загрузки
+- [ ] Подтвердить открытие и сохранение через оригинальный редактор внешности
+- [ ] Проверить совместимость трёх XML навыков с TLS.ModKit и доступность на боевой панели
+- [ ] Проверить начисление опыта после двух разных ночей, без дубликатов при загрузке
+- [ ] Проверить адаптивность нового Unity Canvas на экранах 1366×768, 1920×1080, 2560×1440
 
-## Not completed, requires real game API validation
-- [ ] Guarantee first hero identity/portrait on new runs and save reloads
-- [ ] Bind earned meta-XP to actual night events, bosses and win/loss
-- [ ] Apply meta stats safely without duplication
-- [ ] Grant existing game traits and perks to protagonist only
-- [ ] Bind three special skills to hotbar without weapon requirements
-- [ ] True native Unity UI prefab integration; current UI is styled IMGUI with game sprite lookup
-- [ ] Verify custom skill definitions parse in the installed ModKit
-- [ ] Resolution and localization QA, compatibility with game updates
+## Следующая версия
+- [ ] Выбор существующих перков в метаменю и их автоматическая выдача
+- [ ] Настоящее портретное превью до старта нового забега
+- [ ] Отдельное меню эффектов и подробные описания доступных черт
+- [ ] Подключение опыта за победу/поражение/босса
+- [ ] Дополнительная отрисовка и проверка живых элементов интерфейса по скриншотам
+- [ ] Регрессионные тесты после обновлений игры
 
-## What to provide for next integration
-After loading a NEW RUN, submit BepInEx/LogOutput.log and a screenshot showing hero stats/portrait. Also note whether TLS.ModKit is installed. Do not upload proprietary game DLLs to the public repository.
+Проверять взаимодействие с конкретным билдом The Last Spell по новому `BepInEx/LogOutput.log`. Не загружать оригинальные DLL и арты игры в публичный репозиторий.

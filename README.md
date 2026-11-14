@@ -1,19 +1,34 @@
-# Eternal Hero — Вечный защитник
+# The Last Spell — Eternal Hero / Вечный защитник
 
-[![Build](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml/badge.svg)](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
+[![CI](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml/badge.svg)](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
 
-## Version 0.3 — playable UI and metaprogression test build
+## v0.4 — Native character creator and permanent-protagonist prototype
 
-This is a BepInEx 5 mod prototype for The Last Spell. It is not yet the complete permanent-protagonist gameplay feature.
+The progression UI has been **replaced** by a real Unity UGUI Canvas (not Unity IMGUI/OnGUI). BepInEx 5 only loads the plugin. Uses game sprites/icons when available and locally styled frames as fallback.
 
-**Implemented:** Five tabs with 17 purchasable permanent upgrades, separate JSON profile with a backup, game-styled menu, loaded-game UI sprite lookup (with its own fallback skin), an initial 100 XP / one essence gift after the first hero is found, best-effort capture and restore of character appearance properties, tested run reward ledger, debug diagnostics for game stats and ability APIs. An experimental stat bridge is opt-in only.
+### Current features
 
-**Skill definitions:** Three custom XML skills (EternalGhostShot, EternalEtherSlash, EternalArcanePulse) with Russian names. Requires [TLS.ModKit](https://github.com/stunl0ck/tls-modkit) to load the XML. They are NOT yet granted to the hero automatically.
+- Create a permanent protagonist profile: **name, unlocked race, gender, portrait code, and a loadout of existing game traits**.
+- Creator panel in **Russian**, native Unity buttons, text inputs, scrollable trait picker, original game race icons and game portrait preview.
+- **Native game appearance editor** for faces, artwork, hairstyles, colors, and portrait. It can be opened **after beginning a run**, when a real hero exists.
+- A **single free essence point** granted immediately to existing/new profiles for testing, once only.
+- Harmony patch on the **static** `PlayableUnitManager.CreateStartUnits` (previous versions incorrectly assumed an instance). First generated hero is customized and the selected existing traits are granted through the game's own `AddTrait`.
+- Race change uses the game's race definitions and race stat handlers.
+- Persistent upgrades are applied to game stats through the verified `IncreaseBaseStat` signature on newly generated heroes, with per-object delta protection.
+- Three **weapon-independent special skills** registered through [TLS.ModKit](https://github.com/stunl0ck/tls-modkit) and automatically granted via `SkillController` / `NativeSkills` if unlocked.
+- Stable run ID and automatic night meta-XP on `DistributeDailyExperience`, anti-duplication ledger per day; recognize hero when loading an existing save without stacking stats.
+- Save of character creation choices and purchased upgrades, including backups.
 
-**Still under development:** Guaranteed same portrait and body across runs, automatic real-night rewards, safe automatic game-stat bonuses, actual grants of existing traits/perks, and weapon-independent active skills on the combat hotbar.
+### Limitations and test status
 
-[Download the latest successful artifact](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
+CI **compiles** the plugin, checks persistence tests and validates skill XML syntax. We do **not yet claim** that all behavior works in-game on your build: portrait restoration, hero assignment, race changes, special skills, automatic night XP and stat changes need an actual game smoke test.
 
-See [Install instructions](docs/INSTALL.md) and [Roadmap](docs/ROADMAP.md).
+Existing perks (other than selected game traits), richer illustrations and win/loss/boss automatic rewards are not yet connected; run reward engine already supports these events.
 
-No copyrighted game binaries, portraits or textures are distributed. The game itself supplies UI sprites when available at runtime.
+**Install:** see [Russian instructions](docs/INSTALL.md). **Progress:** [roadmap](docs/ROADMAP.md).
+
+## Download
+
+[Latest successful GitHub Actions build](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml) → Artifacts → EternalHero-prototype.
+
+The repository does not include original game DLLs, copied artwork or fonts.
