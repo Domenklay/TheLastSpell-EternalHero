@@ -23,12 +23,11 @@ namespace EternalHero.Plugin
         private readonly Color muted = new Color(.69f, .71f, .68f);
         private readonly Color garnet = new Color(.40f, .16f, .16f);
         private Font font;
-        private Sprite tile, frame, gamePanel;
+        private Sprite tile, gamePanel;
         private GameObject canvasObject, overlay, launcher;
         private RectTransform rightPane, portraitSlot;
         private Image portraitImage;
         private int tab;
-        private bool openingGameEditor;
         private string status = "";
         private float lastResolve;
         private const float W = 1430f, H = 810f;
@@ -114,7 +113,7 @@ namespace EternalHero.Plugin
             var im = obj.GetComponent<Image>();
             im.sprite = sprite ?? tile;
             im.color = color;
-            im.type = sprite == null ? Image.Type.Sliced : Image.Type.Simple;
+            im.type = sprite == null ? UnityEngine.UI.Image.Type.Sliced : UnityEngine.UI.Image.Type.Simple;
             im.raycastTarget = false;
             return obj;
         }
@@ -149,7 +148,6 @@ namespace EternalHero.Plugin
             block.normalColor = Color.white;
             block.highlightedColor = new Color(1.17f,1.12f,1.06f);
             block.pressedColor = new Color(.8f,.71f,.61f);
-            block.selectedColor = Color.white;
             block.colorMultiplier = 1f;
             btn.colors = block;
             Label(root.transform,text,8,0,w-16,h,19,parchment,TextAnchor.MiddleCenter,true);
