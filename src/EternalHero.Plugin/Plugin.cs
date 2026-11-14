@@ -1,10 +1,9 @@
 using System;
 using System.Collections;
 using System.IO;
-using System.Linq;
-using System.Reflection;
 using BepInEx;
 using BepInEx.Configuration;
+using BepInEx.Logging;
 using EternalHero.Core;
 using HarmonyLib;
 using UnityEngine;
@@ -15,398 +14,190 @@ namespace EternalHero.Plugin
     public sealed class Plugin : BaseUnityPlugin
     {
         internal const string Id = "domenklay.tls.eternalhero";
-        internal const string Version = "0.3.0";
-        internal static Plugin Instance;
+        internal const string Version = "0.4.0";
+
         private Harmony harmony;
         private ProfileStore store;
         private ProgressionService progression;
-        private RunRewards runRewards;
-        private EternalHeroSkin skin;
+        private HeroScreen screen;
+        private ConfigEntry<bool> applyBonuses;
+        private ConfigEntry<bool> debugRewards;
+        private ConfigEntry<bool> openOnStartup;
         private object currentHero;
-        private int activeTab;
-        private bool showDiagnostics;
-        private int appearanceFields;
-        private string identityStatus = "Герой ещё не определён";
-        private readonly string[] branchNames = {
-            "Стальное тело", "Мастер оружия", "Тактический гений", "Наследие", "Запретные техники"
-        };
-        private readonly string[] branchLabels = {
-            "Тело", "Оружие", "Тактика", "Наследие", "Техники"
-        };
-        private ConfigEntry<bool> enableTestRewards;
-        private ConfigEntry<bool> experimentalStatInjection;
-        private ConfigEntry<bool> openMenuOnStartup;
-        private ConfigEntry<bool> showLauncherButton;
-        private ConfigEntry<bool> useGameUISprites;
-        private bool visible;
-        private bool guiSeen;
-        private bool guiErrorLogged;
-        private int lastToggleFrame = -1;
-        private Vector2 scroll;
-        private Rect bounds = new Rect(60, 60, 640, 640);
-        private string lastMessage = "";
-        private string rosterStatus = "The start-roster hook has not fired yet.";
+        private string rosterStatus = "Герой не обнаружен; начни новый забег";
+
+        internal static Plugin Instance { get; private set; }
+        internal HeroProfile Profile => progression?.Profile;
+        internal ProgressionService Progression => progression;
+        internal object CurrentHero => currentHero;
+        internal string RosterStatus => rosterStatus;
+        internal bool EnableDebugRewards => debugRewards != null && debugRewards.Value;
 
         private void Awake()
         {
             Instance = this;
-            enableTestRewards = Config.Bind("Development", "EnableTestRewards", false,
-                "Enable manual debug XP in the F8 panel (NOT intended for normal gameplay).");
-            experimentalStatInjection = Config.Bind("Experimental", "ApplyStatBonuses", false,
-                "Danger: try applying bonuses via reflection. Leave off until verified against your game version.");
-            openMenuOnStartup = Config.Bind("Interface", "OpenMenuOnStartup", true,
-                "Open Eternal Hero progression menu when the game launches (useful if hotkeys fail).");
-            showLauncherButton = Config.Bind("Interface", "ShowLauncherButton", true,
-                "Show an always-visible top-right button to open and close the progression menu.");
-            useGameUISprites = Config.Bind("Interface", "UseGameUISprites", true,
-                "Try reusing already-loaded game panel sprites (with custom styling fallback).");
-            visible = openMenuOnStartup.Value;
-            skin = new EternalHeroSkin(Logger, useGameUISprites.Value);
             try
             {
+                debugRewards = Config.Bind("Development", "EnableTestRewards", false,
+                    "Enable the manual debug XP button.");
+                applyBonuses = Config.Bind("Eternal Hero", "ApplyVerifiedStatBonuses", true,
+                    "Automatically apply purchased stat upgrades to the protagonist on a NEW run.");
+                openOnStartup = Config.Bind("Interface", "OpenCreatorOnStartup", true,
+                    "Open the native Unity character creator on game startup.");
                 store = new ProfileStore(Path.Combine(Paths.ConfigPath, "EternalHero", "profile.json"));
                 progression = new ProgressionService(store.Load());
-                runRewards = new RunRewards(progression);
+                // One free point for initial testing, once per profile. Old v0.3 gift won't be doubled.
+                if (!Profile.StarterEssenceGranted)
+                {
+                    if (!Profile.FirstRunGiftClaimed)
+                    {
+                        if (progression.GrantExperience("career:starter-v0.4", 100))
+                            Logger.LogInfo("Eternal Hero: granted one starter essence for testing.");
+                        Profile.FirstRunGiftClaimed = true;
+                    }
+                    Profile.StarterEssenceGranted = true;
+                    store.Save(Profile);
+                }
+
                 harmony = new Harmony(Id);
-                // This method has been verified in the public Omen of Specialists mod.
-                var target = AccessTools.Method("TheLastStand.Manager.Unit.PlayableUnitManager:CreateStartUnits");
-                if (target == null)
+                var start = AccessTools.Method("TheLastStand.Manager.Unit.PlayableUnitManager:CreateStartUnits");
+                if (start != null)
                 {
-                    Logger.LogWarning("CreateStartUnits was not found. UI/profile will still work.");
-                    rosterStatus = "Start-roster hook not found (game version?)";
+                    // IMPORTANT: CreateStartUnits is STATIC. No __instance argument can be injected.
+                    harmony.Patch(start, postfix: new HarmonyMethod(
+                        AccessTools.Method(typeof(Plugin), nameof(AfterStartUnits))));
+                    Logger.LogInfo("Eternal Hero static CreateStartUnits hook installed.");
                 }
-                else
+                else Logger.LogWarning("CreateStartUnits missing on this game version.");
+
+                var customization = AccessTools.Method(
+                    "TheLastStand.View.PlayableUnitCustomisation.PlayableUnitCustomisationPanel:OnConfirmButtonClicked");
+                if (customization != null)
                 {
-                    var post = AccessTools.Method(typeof(Plugin), nameof(AfterStartUnits));
-                    harmony.Patch(target, postfix: new HarmonyMethod(post));
-                    Logger.LogInfo("Patched PlayableUnitManager.CreateStartUnits");
-                    rosterStatus = "Start-roster hook installed; awaiting run creation.";
+                    harmony.Patch(customization, postfix: new HarmonyMethod(
+                        AccessTools.Method(typeof(Plugin), nameof(AfterNativeAppearanceSaved))));
+                    Logger.LogInfo("Eternal Hero native appearance save hook installed.");
                 }
-                Logger.LogInfo("Eternal Hero v" + Version +
-                    " loaded. UI starts open=" + visible +
-                    "; hotkeys F8/F9/Home, top-right launcher enabled=" + showLauncherButton.Value);
+                Logger.LogInfo("Eternal Hero v" + Version + " initialized (Unity Canvas).");
             }
-            catch (Exception e) { Logger.LogError(e); }
+            catch (Exception e) { Logger.LogError("Eternal Hero boot error: " + e); }
         }
 
-        private static void AfterStartUnits(object __instance)
+        private void Start()
         {
-            if (Instance != null && __instance != null)
-                Instance.StartCoroutine(Instance.InspectAfterUiReady(__instance));
-        }
-
-        private IEnumerator InspectAfterUiReady(object manager)
-        {
-            yield return null;
-            yield return null;
             try
             {
-                var hero = HeroRuntime.TryGetFirstHero(manager);
-                if (hero == null)
-                {
-                    rosterStatus = "Starting units created, but first hero not resolved. See log.";
-                    Logger.LogWarning("Could not resolve hero from manager " + manager.GetType().FullName
-                        + ". Candidate members: " + HeroRuntime.DiagnosticMembers(manager));
-                    yield break;
-                }
-
-                rosterStatus = "Candidate first hero: " + hero.GetType().FullName;
-                currentHero = hero;
-                bool captured;
-                appearanceFields = HeroIdentity.CaptureOrRestore(progression.Profile, hero, out captured);
-                identityStatus = captured
-                    ? "Запомнены параметры внешности: " + appearanceFields
-                    : "Восстановлены параметры внешности: " + appearanceFields;
-                if (captured)
-                    store.Save(progression.Profile);
-                Logger.LogInfo("Eternal Hero appearance: " + identityStatus);
-                var stableId = HeroRunIdentity.TryGetStableHeroId(hero);
-                if (!string.IsNullOrWhiteSpace(stableId))
-                {
-                    bool isNewRun = runRewards.Begin(stableId);
-                    if (isNewRun) store.Save(progression.Profile);
-                    Logger.LogInfo("Eternal Hero provisional run key: " + stableId +
-                        "; new run=" + isNewRun + "; requires reload/new-run verification");
-                    rosterStatus += "; provisional run key found";
-                }
-                else
-                {
-                    Logger.LogWarning("Eternal Hero could not resolve stable game run ID. " +
-                        "Automatic per-run XP disabled until game API verified.");
-                    rosterStatus += "; no stable run key";
-                }
-                if (!progression.Profile.FirstRunGiftClaimed)
-                {
-                    // One-time onboarding grant; never repeat on game restarts.
-                    if (progression.GrantExperience("career:welcome-v1", 100))
-                    {
-                        progression.Profile.FirstRunGiftClaimed = true;
-                        store.Save(progression.Profile);
-                        lastMessage = "Первый дар наследия: +100 опыта (1 эссенция)";
-                        Logger.LogInfo("Eternal Hero: first-run legacy gift awarded once");
-                    }
-                }
-
-                var named = HeroRuntime.TrySetHeroName(hero, progression.Profile.HeroName);
-                Logger.LogInfo("Identified starting hero; fixed name applied: " + named +
-                    "; type=" + hero.GetType().FullName);
-                Logger.LogInfo("Hero stat bridge: " + HeroRuntime.DiagnosticStatSurface(hero));
-                Logger.LogInfo("Hero ability bridge: " + GameApiProbe.HeroAbilityMethods(hero));
-                Logger.LogInfo(GameApiProbe.SkillDefinitions());
-                if (experimentalStatInjection.Value)
-                {
-                    int applied = HeroRuntime.TryApplyBonuses(hero, progression.CalculatedStatBonuses(), Logger);
-                    Logger.LogWarning("EXPERIMENTAL stat adjustments attempted: " + applied);
-                    rosterStatus += "; applied stat calls: " + applied;
-                }
-                else rosterStatus += "; stat bridge disabled for safety";
+                screen = new HeroScreen(this, Logger);
+                screen.Init();
+                if (openOnStartup.Value) screen.Open();
+                Logger.LogInfo("Eternal Hero native creator ready; click upper-right launcher.");
             }
-            catch (Exception ex)
+            catch (Exception e) { Logger.LogError("Eternal Hero canvas init error: " + e); }
+        }
+
+        // Called after the game's STATIC CreateStartUnits(), not on an instance.
+        private static void AfterStartUnits()
+        {
+            if (Instance != null) Instance.StartCoroutine(Instance.ConfigureStartingHero());
+        }
+
+        private IEnumerator ConfigureStartingHero()
+        {
+            yield return null;
+            yield return null;
+            currentHero = GameBridge.FirstHero();
+            if (currentHero == null)
             {
-                rosterStatus = "Roster inspection failed; see log";
-                Logger.LogError(ex);
+                rosterStatus = "Стартовая команда создана, но список героев не найден";
+                Logger.LogWarning("Eternal Hero: PlayableUnits not resolved. API probe required.");
+                screen?.Notify(rosterStatus);
+                yield break;
+            }
+            Logger.LogInfo("Eternal Hero: first unit discovered " + currentHero.GetType().FullName);
+            ApplyCurrentHero();
+            screen?.NotifyHero();
+        }
+
+        private static void AfterNativeAppearanceSaved(object __instance)
+        {
+            if (Instance == null || Instance.currentHero == null) return;
+            object edited = GameBridge.Get(__instance, "playableUnit");
+            if (!ReferenceEquals(edited, Instance.currentHero)) return;
+            GameBridge.CaptureEditorResult(Instance.currentHero, Instance.Profile);
+            Instance.SaveProfile();
+            Instance.Logger.LogInfo("Eternal Hero: native portrait, gender and name saved to profile.");
+            Instance.screen?.Open();
+            Instance.screen?.Notify("Облик героя сохранён и будет восстановлен в новых забегах");
+        }
+
+        internal void SaveProfile()
+        {
+            try { if (Profile != null) store.Save(Profile); }
+            catch (Exception e) { Logger.LogError("Eternal Hero save failed: " + e); }
+        }
+
+        internal void ApplyCurrentHero()
+        {
+            if (currentHero == null || Profile == null) return;
+            try
+            {
+                if (Profile.CreationConfirmed)
+                {
+                    string applied = GameBridge.Apply(currentHero, Profile, Logger);
+                    rosterStatus = applied;
+                    Logger.LogInfo("Eternal Hero applied profile: " + applied);
+                }
+                if (applyBonuses.Value)
+                {
+                    int n = HeroRuntime.TryApplyBonuses(currentHero,
+                        progression.CalculatedStatBonuses(), Logger);
+                    Logger.LogInfo("Eternal Hero stat upgrades applied: " + n);
+                }
+                string skills = GameSkills.Grant(currentHero, Profile, Logger);
+                Logger.LogInfo("Eternal Hero active skills: " + skills);
+                Logger.LogInfo("Eternal Hero stat API: " + HeroRuntime.DiagnosticStatSurface(currentHero));
+                Logger.LogInfo("Eternal Hero ability API: " + GameApiProbe.HeroAbilityMethods(currentHero));
+                Logger.LogInfo("Eternal Hero skill definitions: " + GameApiProbe.SkillDefinitions());
+            }
+            catch (Exception e) { rosterStatus = "Ошибка применения профиля: " + e.Message; Logger.LogError(e); }
+            screen?.NotifyHero();
+        }
+
+        internal void OpenAppearanceEditor()
+        {
+            if (currentHero == null)
+            {
+                screen?.Notify("Сначала начни новый забег: редактор игры работает с существующим героем.");
+                return;
+            }
+            screen?.Hide();
+            if (!GameBridge.OpenNativeEditor(currentHero, Logger))
+            {
+                screen?.Open();
+                screen?.Notify("Оригинальный редактор игры недоступен в текущей сцене; проверь лог.");
             }
         }
 
-        private void ToggleMenu(string source)
+        internal void GrantDebugExperience()
         {
-            // IMGUI and Input.GetKeyDown can both observe the same key in one frame.
-            if (lastToggleFrame == Time.frameCount) return;
-            lastToggleFrame = Time.frameCount;
-            visible = !visible;
-            Logger.LogInfo("Eternal Hero menu " + (visible ? "OPEN" : "CLOSED") + " via " + source);
+            if (!EnableDebugRewards) return;
+            try
+            {
+                if (progression.GrantExperience("developer:" + Guid.NewGuid().ToString("N"), 100))
+                    SaveProfile();
+            }
+            catch (Exception e) { Logger.LogError(e); }
         }
 
         private void Update()
         {
             try
             {
-                if (Input.GetKeyDown(KeyCode.F8) ||
-                    Input.GetKeyDown(KeyCode.F9) ||
+                if (Input.GetKeyDown(KeyCode.F8) || Input.GetKeyDown(KeyCode.F9) ||
                     Input.GetKeyDown(KeyCode.Home))
-                    ToggleMenu("Unity Input");
+                    screen?.Toggle();
             }
-            catch (Exception e)
-            {
-                if (!guiErrorLogged)
-                {
-                    guiErrorLogged = true;
-                    Logger.LogError("Eternal Hero keyboard check failed: " + e);
-                }
-            }
-        }
-
-        private void OnGUI()
-        {
-            try
-            {
-                if (!guiSeen)
-                {
-                    guiSeen = true;
-                    Logger.LogInfo("Eternal Hero OnGUI reached. Resolution " + Screen.width + "x" + Screen.height);
-                }
-
-                // Fallback for games which consume Input.GetKeyDown before our Update.
-                var current = Event.current;
-                if (current != null && current.type == EventType.KeyDown &&
-                    (current.keyCode == KeyCode.F8 ||
-                     current.keyCode == KeyCode.F9 ||
-                     current.keyCode == KeyCode.Home))
-                {
-                    ToggleMenu("IMGUI KeyDown");
-                    current.Use();
-                }
-
-                // Always-rendered mouse control, independent of the progression window.
-                if (showLauncherButton != null && showLauncherButton.Value)
-                {
-                    var launcher = new Rect(
-                        Mathf.Max(4f, Screen.width - 206f),
-                        8f, 198f, 36f);
-                    if (GUI.Button(launcher, visible ? "Eternal Hero - CLOSE" : "Eternal Hero - OPEN"))
-                        ToggleMenu("mouse launcher");
-                }
-
-                if (!visible || progression == null) return;
-                bounds.width = Mathf.Min(640f, Mathf.Max(280f, Screen.width - 16f));
-                bounds.height = Mathf.Min(640f, Mathf.Max(180f, Screen.height - 56f));
-                bounds.x = Mathf.Clamp(bounds.x, 0, Mathf.Max(0, Screen.width - bounds.width));
-                bounds.y = Mathf.Clamp(bounds.y, 0, Mathf.Max(0, Screen.height - bounds.height));
-                bounds = GUI.Window(187113, bounds, DrawWindow, "ВЕЧНЫЙ ЗАЩИТНИК — НАСЛЕДИЕ", skin.Window);
-            }
-            catch (Exception ex)
-            {
-                if (!guiErrorLogged)
-                {
-                    guiErrorLogged = true;
-                    Logger.LogError("Eternal Hero OnGUI error: " + ex);
-                }
-            }
-        }
-
-        private void DrawWindow(int id)
-        {
-            // Rich backing uses game-loaded UI sprites when identifiable, never exported as assets.
-            skin.DrawGamePanel(new Rect(3, 24, bounds.width - 6, bounds.height - 28));
-            GUILayout.BeginVertical();
-            try
-            {
-                GUILayout.Label(progression.Profile.HeroName, skin.Title);
-                GUILayout.BeginHorizontal();
-                GUILayout.Label("Постоянный опыт: " + progression.Profile.LifetimeExperience, skin.Label);
-                GUILayout.Label("Эссенция: " + progression.Profile.AvailableEssence, skin.Header);
-                GUILayout.EndHorizontal();
-                long remainder = progression.Profile.LifetimeExperience % ProgressionService.ExperiencePerEssence;
-                skin.Progress((float)remainder / ProgressionService.ExperiencePerEssence);
-                GUILayout.Label("До следующего очка наследия: " +
-                    (ProgressionService.ExperiencePerEssence - remainder) + " опыта", skin.Tiny);
-                GUILayout.Label("Забеги: " + progression.Profile.RunsStarted +
-                    "   |   Победы: " + progression.Profile.Victories +
-                    "   |   Пережито ночей: " + progression.Profile.TotalNightsSurvived,
-                    skin.Tiny);
-
-                skin.DrawDivider(bounds.width);
-                GUILayout.BeginHorizontal();
-                for (int i = 0; i < branchLabels.Length; i++)
-                {
-                    int ix = i;
-                    var style = activeTab == ix ? skin.Selected : skin.Button;
-                    if (GUILayout.Button(branchLabels[ix], style, GUILayout.MinHeight(34)))
-                    {
-                        activeTab = ix;
-                        scroll = Vector2.zero;
-                    }
-                }
-                GUILayout.EndHorizontal();
-                skin.DrawDivider(bounds.width);
-                GUILayout.Label(branchNames[activeTab].ToUpperInvariant(), skin.Header);
-
-                scroll = GUILayout.BeginScrollView(scroll, GUILayout.ExpandHeight(true));
-                try
-                {
-                    foreach (var upgrade in UpgradeCatalog.All.Where(u => u.Branch == branchNames[activeTab]))
-                    {
-                        int rank = progression.Rank(upgrade.Id);
-                        GUILayout.BeginVertical(skin.Card);
-                        GUILayout.BeginHorizontal();
-                        GUILayout.Label(upgrade.Name, skin.Header);
-                        GUILayout.FlexibleSpace();
-                        GUILayout.Label(rank + " / " + upgrade.MaxRank, skin.Label, GUILayout.Width(65));
-                        GUILayout.EndHorizontal();
-                        GUILayout.Label(upgrade.Description, skin.Label);
-                        if (upgrade.RequiresGameIntegration)
-                            GUILayout.Label("Особая механика: требуется игровая интеграция", skin.Tiny);
-                        if (rank < upgrade.MaxRank)
-                        {
-                            var canBuy = progression.CanPurchase(upgrade.Id, out var reason);
-                            bool enabled = GUI.enabled;
-                            GUI.enabled = canBuy;
-                            if (GUILayout.Button("Изучить • " +
-                                upgrade.CostForNextRank(rank) + " эссенции", skin.Button,
-                                GUILayout.MinHeight(30)))
-                            {
-                                try
-                                {
-                                    if (progression.Purchase(upgrade.Id, out reason))
-                                    {
-                                        store.Save(progression.Profile);
-                                        lastMessage = "Открыто: " + upgrade.Name;
-                                        Logger.LogInfo("Purchased " + upgrade.Id + " rank " + progression.Rank(upgrade.Id));
-                                        if (currentHero != null && experimentalStatInjection.Value)
-                                            ApplyCurrentBonuses();
-                                    }
-                                }
-                                catch (Exception ex) { lastMessage = ex.Message; Logger.LogError(ex); }
-                            }
-                            GUI.enabled = enabled;
-                            if (!canBuy)
-                                GUILayout.Label(ReasonInRussian(reason), skin.Tiny);
-                        }
-                        else GUILayout.Label("ИЗУЧЕНО", skin.Header);
-                        GUILayout.EndVertical();
-                        GUILayout.Space(5);
-                    }
-                }
-                finally { GUILayout.EndScrollView(); }
-
-                if (GUILayout.Button(showDiagnostics ? "Скрыть диагностику" : "Информация и диагностика",
-                    skin.Button, GUILayout.Height(29))) showDiagnostics = !showDiagnostics;
-                if (showDiagnostics)
-                {
-                    GUILayout.Label(rosterStatus, skin.Tiny);
-                    GUILayout.Label(identityStatus, skin.Tiny);
-                    GUILayout.Label("Привязка забега: " +
-                        (string.IsNullOrWhiteSpace(progression.Profile.CurrentRunId) ? "не обнаружена" :
-                         "обнаружен предварительный идентификатор"), skin.Tiny);
-                    GUILayout.Label("Игровой статус навыков: определения XML есть; привязка к ГГ ещё не сделана", skin.Tiny);
-                    GUILayout.Label("Текстура из игры: " + (skin.UsingGameSprite ? "найдена" : "не найдена, используется запасная"), skin.Tiny);
-                    GUILayout.Label("Применение статов: " + (experimentalStatInjection.Value ? "тестовое" : "отключено"), skin.Tiny);
-                    if (currentHero != null)
-                    {
-                        if (GUILayout.Button("Попробовать применить купленные бонусы к герою", skin.Button))
-                            ApplyCurrentBonuses();
-                    }
-                    else GUILayout.Label("Сначала начни новый забег: герой ещё не обнаружен", skin.Tiny);
-                    if (enableTestRewards.Value)
-                    {
-                        if (GUILayout.Button("DEV: +100 опыта", skin.Button))
-                        {
-                            try
-                            {
-                                if (progression.GrantExperience("dev:" + Guid.NewGuid().ToString("N"), 100))
-                                {
-                                    store.Save(progression.Profile);
-                                    lastMessage = "Добавлено 100 тестового опыта";
-                                }
-                            }
-                            catch (Exception ex) { lastMessage = ex.Message; Logger.LogError(ex); }
-                        }
-                    }
-                    GUILayout.Label("Особые навыки пока не прикреплены к боевой панели. Установленные ранги сохраняются.", skin.Tiny);
-                }
-                if (!string.IsNullOrWhiteSpace(lastMessage))
-                    GUILayout.Label(lastMessage, skin.Header);
-                GUILayout.BeginHorizontal();
-                if (GUILayout.Button("Свернуть", skin.Button, GUILayout.MinHeight(29)))
-                    visible = false;
-                GUILayout.EndHorizontal();
-            }
-            catch (Exception e)
-            {
-                Logger.LogError("Eternal Hero DrawWindow failed: " + e);
-                GUILayout.Label("Ошибка интерфейса: проверь BepInEx/LogOutput.log", skin.Warning);
-            }
-            finally { GUILayout.EndVertical(); }
-            GUI.DragWindow(new Rect(0, 0, bounds.width, 24));
-        }
-
-        private static string ReasonInRussian(string reason)
-        {
-            switch (reason)
-            {
-                case "Not enough essence": return "Недостаточно эссенции";
-                case "Prerequisite not met": return "Сначала изучи предыдущий талант";
-                case "Already max rank": return "Максимальный ранг";
-                default: return reason ?? "";
-            }
-        }
-
-        private void ApplyCurrentBonuses()
-        {
-            if (!experimentalStatInjection.Value)
-            {
-                lastMessage = "В настройках включи Experimental > ApplyStatBonuses = true, если согласен тестировать на отдельном сохранении";
-                return;
-            }
-            try
-            {
-                int applied = HeroRuntime.TryApplyBonuses(
-                    currentHero, progression.CalculatedStatBonuses(), Logger);
-                lastMessage = "Изменено характеристик: " + applied +
-                    ". Проверь характеристики ГГ и BepInEx/LogOutput.log";
-                Logger.LogInfo(lastMessage);
-            }
-            catch (Exception ex) { lastMessage = ex.Message; Logger.LogError(ex); }
+            catch (Exception e) { Logger.LogWarning("Creator hotkey: " + e.Message); }
         }
 
         private void OnDestroy()
