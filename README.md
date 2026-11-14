@@ -1,18 +1,27 @@
-# The Last Spell — Eternal Hero (Вечный защитник)
+# The Last Spell — Eternal Hero / Вечный защитник
 
-A work-in-progress BepInEx 5 mod for **The Last Spell**.
+[![Build](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml/badge.svg)](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
 
-## Goal
-One persistent protagonist replaces one member of the starting roster. The hero begins each run at normal run level 1, while separate upgrades and special abilities persist between runs.
+**v0.1 technical prototype** for BepInEx 5 x64. The goal is one recurring protagonist with an independent, persistent metaprogression tree.
 
-## Current development status
-**Prototype / not a complete gameplay mod.** The repository will contain an isolated persistent progression engine, a BepInEx in-game development panel, and a verified start-roster method hook. Fixed identity, automatic end-of-night rewards, full game-stat integration, and weapon-independent active skills require validation against the installed game's assemblies before they can be marked complete.
+## Current working components
+- Game-independent progression engine: five branches, 17 upgrades, rank limits and prerequisites.
+- Purchases, experience → essence conversion, duplicate-reward prevention.
+- Local JSON profile + backup on subsequent saves.
+- F8 in-game progression panel, including a debug-only experience button.
+- Harmony hook for `PlayableUnitManager.CreateStartUnits` and diagnostic attempt to find the first starting character.
+- Automated GitHub Actions tests and compilation of `EternalHero.Core.dll` and `EternalHero.Plugin.dll`.
 
-See `docs/ROADMAP.md` and `docs/INSTALL.md` once the initial scaffold is committed.
+**Not yet implemented/verified:** automatic experience from the game, reliable fixed identity across runs, safe automatic application of stat bonuses, persistent perks/traits and weapon-independent active combat abilities. The runtime bridge is experimental and stat injection is OFF by default.
 
-## Dependencies
-- The Last Spell (legitimate local installation)
-- BepInEx 5 x64
-- .NET SDK 8 for development
+## Download / install
+[Latest successful build](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml) → open run → **Artifacts → EternalHero-prototype**. The downloaded artifact includes an installable ZIP with both DLLs. GitHub may require signing in to download workflow artifacts.
 
-No proprietary game binaries are committed to this repository.
+See [Russian installation instructions](docs/INSTALL.md) and [feature roadmap](docs/ROADMAP.md).
+
+## Building
+- .NET SDK 8, NuGet restore (the BepInEx feed is configured in `NuGet.Config`).
+- `dotnet run --project tests/EternalHero.Tests/EternalHero.Tests.csproj -c Release`
+- `dotnet build src/EternalHero.Plugin/EternalHero.Plugin.csproj -c Release`
+
+The project does not publish proprietary game DLLs or redistribute third-party mod assets.
