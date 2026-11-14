@@ -34,6 +34,26 @@ internal static class Program
             loaded.GrantExperience("run-1:night-2", 100);
             store.Save(loaded.Profile);
             Check(File.Exists(store.BackupPath), "backup created on subsequent save");
+            var rewards = new RunRewards(loaded);
+            Check(rewards.Begin("saveA/zone1/run1"), "stable first run started");
+            Check(!rewards.Begin("saveA/zone1/run1"), "loading same run doesn't restart rewards");
+            Check(rewards.NightSurvived(1), "completed first night");
+            Check(!rewards.NightSurvived(1), "night can't be rewarded twice");
+            Check(!rewards.NightSurvived(3), "skipped night not incorrectly rewarded");
+            Check(rewards.BossDefeated("boss-1"), "boss awarded once");
+            Check(!rewards.BossDefeated("boss-1"), "same boss cannot be farmed");
+            Check(rewards.Finish(true), "run victory rewarded");
+            Check(!rewards.Finish(true), "victory cannot be farmed");
+            Check(!rewards.NightSurvived(2), "no rewards after run ends");
+            store.Save(loaded.Profile);
+            var next = new ProgressionService(store.Load());
+            var nextRewards = new RunRewards(next);
+            Check(!nextRewards.Begin("saveA/zone1/run1"), "run identity survives game reload");
+            Check(nextRewards.Begin("saveA/zone1/run2"), "new run creates new reward scope");
+            Check(nextRewards.NightSurvived(1), "same night in another run can grant XP");
+            Check(next.Profile.RunsStarted == 2, "run counter persisted");
+            Check(next.Profile.Victories == 1, "victory counter persisted");
+            Check(next.Profile.BossesDefeated == 1, "boss counter persisted");
             Console.WriteLine("ALL PROGRESSION TESTS PASSED");
         }
         finally

@@ -18,6 +18,13 @@ namespace EternalHero.Core
         [DataMember] public int RunsStarted { get; set; }
         [DataMember] public int Victories { get; set; }
         [DataMember] public int Defeats { get; set; }
+        [DataMember] public string CurrentRunId { get; set; } = "";
+        [DataMember] public int LastCompletedNight { get; set; }
+        [DataMember] public int TotalNightsSurvived { get; set; }
+        [DataMember] public int BossesDefeated { get; set; }
+        [DataMember] public bool RunFinished { get; set; }
+        [DataMember] public string PortraitHint { get; set; } = "";
+        [DataMember] public bool FirstRunGiftClaimed { get; set; }
         [DataMember] public Dictionary<string, int> Ranks { get; set; } = new Dictionary<string, int>();
         [DataMember] public HashSet<string> ClaimedRewardIds { get; set; } = new HashSet<string>();
     }
