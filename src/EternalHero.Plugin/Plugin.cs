@@ -71,6 +71,14 @@ namespace EternalHero.Plugin
                     Logger.LogInfo("Eternal Hero static CreateStartUnits hook installed.");
                 }
                 else Logger.LogWarning("CreateStartUnits missing on this game version.");
+                var deserialize = AccessTools.Method("TheLastStand.Manager.Unit.PlayableUnitManager:Deserialize");
+                if (deserialize != null)
+                {
+                    harmony.Patch(deserialize, postfix: new HarmonyMethod(
+                        AccessTools.Method(typeof(Plugin), nameof(AfterRosterLoad))));
+                    Logger.LogInfo("Eternal Hero existing-save roster detection hook installed.");
+                }
+
 
                 var nightXp = AccessTools.Method("TheLastStand.Manager.Unit.PlayableUnitManager:DistributeDailyExperience");
                 if (nightXp != null)
@@ -109,6 +117,25 @@ namespace EternalHero.Plugin
         private static void AfterStartUnits()
         {
             if (Instance != null) Instance.StartCoroutine(Instance.ConfigureStartingHero());
+        }
+
+        private static void AfterRosterLoad()
+        {
+            if (Instance != null) Instance.StartCoroutine(Instance.RecognizeLoadedHero());
+        }
+
+        private IEnumerator RecognizeLoadedHero()
+        {
+            yield return null;
+            yield return null;
+            var found = GameBridge.FirstHero();
+            if (found == null || ReferenceEquals(currentHero, found)) yield break;
+            currentHero = found;
+            rosterStatus = "Герой найден в загруженном забеге. Сохранённые характеристики не начисляются повторно.";
+            Logger.LogInfo("Eternal Hero: loaded first hero from existing save; skipping stat reapplication.");
+            if (Profile != null && Profile.CreationConfirmed)
+                Logger.LogInfo("Eternal Hero resumed active skills: " + GameSkills.Grant(found, Profile, Logger));
+            screen?.NotifyHero();
         }
 
         private IEnumerator ConfigureStartingHero()
