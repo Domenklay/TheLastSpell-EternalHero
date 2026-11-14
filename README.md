@@ -2,13 +2,13 @@
 
 [![Build](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml/badge.svg)](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
 
-**v0.1 technical prototype** for BepInEx 5 x64. The goal is one recurring protagonist with an independent, persistent metaprogression tree.
+**v0.1.1 technical prototype** for BepInEx 5 x64. The goal is one recurring protagonist with an independent, persistent metaprogression tree.
 
 ## Current working components
 - Game-independent progression engine: five branches, 17 upgrades, rank limits and prerequisites.
 - Purchases, experience → essence conversion, duplicate-reward prevention.
 - Local JSON profile + backup on subsequent saves.
-- F8 in-game progression panel, including a debug-only experience button.
+- In-game progression panel opens automatically on startup; top-right OPEN/CLOSE button, F8/F9/Home shortcuts; optional debug XP button.
 - Harmony hook for `PlayableUnitManager.CreateStartUnits` and diagnostic attempt to find the first starting character.
 - Automated GitHub Actions tests and compilation of `EternalHero.Core.dll` and `EternalHero.Plugin.dll`.
 
