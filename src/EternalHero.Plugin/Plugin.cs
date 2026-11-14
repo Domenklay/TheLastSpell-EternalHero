@@ -15,15 +15,27 @@ namespace EternalHero.Plugin
     public sealed class Plugin : BaseUnityPlugin
     {
         internal const string Id = "domenklay.tls.eternalhero";
-        internal const string Version = "0.1.1";
+        internal const string Version = "0.2.0";
         internal static Plugin Instance;
         private Harmony harmony;
         private ProfileStore store;
         private ProgressionService progression;
+        private RunRewards runRewards;
+        private EternalHeroSkin skin;
+        private object currentHero;
+        private int activeTab;
+        private bool showDiagnostics;
+        private readonly string[] branchNames = {
+            "Стальное тело", "Мастер оружия", "Тактический гений", "Наследие", "Запретные техники"
+        };
+        private readonly string[] branchLabels = {
+            "Тело", "Оружие", "Тактика", "Наследие", "Техники"
+        };
         private ConfigEntry<bool> enableTestRewards;
         private ConfigEntry<bool> experimentalStatInjection;
         private ConfigEntry<bool> openMenuOnStartup;
         private ConfigEntry<bool> showLauncherButton;
+        private ConfigEntry<bool> useGameUISprites;
         private bool visible;
         private bool guiSeen;
         private bool guiErrorLogged;
@@ -44,11 +56,15 @@ namespace EternalHero.Plugin
                 "Open Eternal Hero progression menu when the game launches (useful if hotkeys fail).");
             showLauncherButton = Config.Bind("Interface", "ShowLauncherButton", true,
                 "Show an always-visible top-right button to open and close the progression menu.");
+            useGameUISprites = Config.Bind("Interface", "UseGameUISprites", true,
+                "Try reusing already-loaded game panel sprites (with custom styling fallback).");
             visible = openMenuOnStartup.Value;
+            skin = new EternalHeroSkin(Logger, useGameUISprites.Value);
             try
             {
                 store = new ProfileStore(Path.Combine(Paths.ConfigPath, "EternalHero", "profile.json"));
                 progression = new ProgressionService(store.Load());
+                runRewards = new RunRewards(progression);
                 harmony = new Harmony(Id);
                 // This method has been verified in the public Omen of Specialists mod.
                 var target = AccessTools.Method("TheLastStand.Manager.Unit.PlayableUnitManager:CreateStartUnits");
@@ -93,8 +109,11 @@ namespace EternalHero.Plugin
                 }
 
                 rosterStatus = "Candidate first hero: " + hero.GetType().FullName;
+                currentHero = hero;
                 var named = HeroRuntime.TrySetHeroName(hero, progression.Profile.HeroName);
-                Logger.LogInfo("Identified starting hero; fixed name applied: " + named);
+                Logger.LogInfo("Identified starting hero; fixed name applied: " + named +
+                    "; type=" + hero.GetType().FullName);
+                Logger.LogInfo("Hero stat bridge: " + HeroRuntime.DiagnosticStatSurface(hero));
                 if (experimentalStatInjection.Value)
                 {
                     int applied = HeroRuntime.TryApplyBonuses(hero, progression.CalculatedStatBonuses(), Logger);
@@ -174,7 +193,7 @@ namespace EternalHero.Plugin
                 bounds.height = Mathf.Min(640f, Mathf.Max(180f, Screen.height - 56f));
                 bounds.x = Mathf.Clamp(bounds.x, 0, Mathf.Max(0, Screen.width - bounds.width));
                 bounds.y = Mathf.Clamp(bounds.y, 0, Mathf.Max(0, Screen.height - bounds.height));
-                bounds = GUI.Window(187113, bounds, DrawWindow, "Eternal Hero - Наследие");
+                bounds = GUI.Window(187113, bounds, DrawWindow, "ВЕЧНЫЙ ЗАЩИТНИК — НАСЛЕДИЕ", skin.Window);
             }
             catch (Exception ex)
             {
@@ -188,61 +207,162 @@ namespace EternalHero.Plugin
 
         private void DrawWindow(int id)
         {
+            // Rich backing uses game-loaded UI sprites when identifiable, never exported as assets.
+            skin.DrawGamePanel(new Rect(3, 24, bounds.width - 6, bounds.height - 28));
             GUILayout.BeginVertical();
-            GUILayout.Label("Персонаж: " + progression.Profile.HeroName);
-            GUILayout.Label("Общий опыт: " + progression.Profile.LifetimeExperience
-                + "   |   Эссенция: " + progression.Profile.AvailableEssence);
-            GUILayout.Label("Следующее очко за каждые " + ProgressionService.ExperiencePerEssence + " опыта");
-            GUILayout.Label("Статус: " + rosterStatus);
-            GUILayout.Label("Версия 0.1: профиль и панель работают; автоматические награды и специальные боевые умения ещё не подключены.");
-            if (enableTestRewards.Value && GUILayout.Button("DEV: +100 опыта"))
+            try
             {
+                GUILayout.Label(progression.Profile.HeroName, skin.Title);
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("Постоянный опыт: " + progression.Profile.LifetimeExperience, skin.Label);
+                GUILayout.Label("Эссенция: " + progression.Profile.AvailableEssence, skin.Header);
+                GUILayout.EndHorizontal();
+                long remainder = progression.Profile.LifetimeExperience % ProgressionService.ExperiencePerEssence;
+                skin.Progress((float)remainder / ProgressionService.ExperiencePerEssence);
+                GUILayout.Label("До следующего очка наследия: " +
+                    (ProgressionService.ExperiencePerEssence - remainder) + " опыта", skin.Tiny);
+                GUILayout.Label("Забеги: " + progression.Profile.RunsStarted +
+                    "   |   Победы: " + progression.Profile.Victories +
+                    "   |   Пережито ночей: " + progression.Profile.TotalNightsSurvived,
+                    skin.Tiny);
+
+                skin.DrawDivider(bounds.width);
+                GUILayout.BeginHorizontal();
+                for (int i = 0; i < branchLabels.Length; i++)
+                {
+                    int ix = i;
+                    var style = activeTab == ix ? skin.Selected : skin.Button;
+                    if (GUILayout.Button(branchLabels[ix], style, GUILayout.MinHeight(34)))
+                    {
+                        activeTab = ix;
+                        scroll = Vector2.zero;
+                    }
+                }
+                GUILayout.EndHorizontal();
+                skin.DrawDivider(bounds.width);
+                GUILayout.Label(branchNames[activeTab].ToUpperInvariant(), skin.Header);
+
+                scroll = GUILayout.BeginScrollView(scroll, GUILayout.ExpandHeight(true));
                 try
                 {
-                    if (progression.GrantExperience("dev:" + Guid.NewGuid().ToString("N"), 100))
+                    foreach (var upgrade in UpgradeCatalog.All.Where(u => u.Branch == branchNames[activeTab]))
                     {
-                        store.Save(progression.Profile);
-                        lastMessage = "Добавлено 100 тестового опыта";
-                    }
-                }
-                catch (Exception ex) { lastMessage = ex.Message; Logger.LogError(ex); }
-            }
-            scroll = GUILayout.BeginScrollView(scroll, GUILayout.ExpandHeight(true));
-            foreach (var branch in UpgradeCatalog.All.Select(u => u.Branch).Distinct())
-            {
-                GUILayout.Space(7);
-                GUILayout.Label("══ " + branch + " ══");
-                foreach (var upgrade in UpgradeCatalog.All.Where(u => u.Branch == branch))
-                {
-                    int rank = progression.Rank(upgrade.Id);
-                    string label = upgrade.Name + " [" + rank + "/" + upgrade.MaxRank + "] — " + upgrade.Description;
-                    GUILayout.Label(label);
-                    if (upgrade.RequiresGameIntegration)
-                        GUILayout.Label("Реализация игрового эффекта: в разработке. Покупка уже сохраняется.");
-                    if (rank >= upgrade.MaxRank) continue;
-                    bool canBuy = progression.CanPurchase(upgrade.Id, out var reason);
-                    GUI.enabled = canBuy;
-                    if (GUILayout.Button("Изучить за " + upgrade.CostForNextRank(rank) + " эссенции"))
-                    {
-                        try
+                        int rank = progression.Rank(upgrade.Id);
+                        GUILayout.BeginVertical(GUI.skin.box);
+                        GUILayout.BeginHorizontal();
+                        GUILayout.Label(upgrade.Name, skin.Header);
+                        GUILayout.FlexibleSpace();
+                        GUILayout.Label(rank + " / " + upgrade.MaxRank, skin.Label, GUILayout.Width(65));
+                        GUILayout.EndHorizontal();
+                        GUILayout.Label(upgrade.Description, skin.Label);
+                        if (upgrade.RequiresGameIntegration)
+                            GUILayout.Label("Особая механика: требуется игровая интеграция", skin.Tiny);
+                        if (rank < upgrade.MaxRank)
                         {
-                            if (progression.Purchase(upgrade.Id, out reason))
+                            var canBuy = progression.CanPurchase(upgrade.Id, out var reason);
+                            bool enabled = GUI.enabled;
+                            GUI.enabled = canBuy;
+                            if (GUILayout.Button("Изучить • " +
+                                upgrade.CostForNextRank(rank) + " эссенции", skin.Button,
+                                GUILayout.MinHeight(30)))
                             {
-                                store.Save(progression.Profile);
-                                lastMessage = "Изучено: " + upgrade.Name;
+                                try
+                                {
+                                    if (progression.Purchase(upgrade.Id, out reason))
+                                    {
+                                        store.Save(progression.Profile);
+                                        lastMessage = "Открыто: " + upgrade.Name;
+                                        Logger.LogInfo("Purchased " + upgrade.Id + " rank " + progression.Rank(upgrade.Id));
+                                        if (currentHero != null && experimentalStatInjection.Value)
+                                            ApplyCurrentBonuses();
+                                    }
+                                }
+                                catch (Exception ex) { lastMessage = ex.Message; Logger.LogError(ex); }
                             }
+                            GUI.enabled = enabled;
+                            if (!canBuy)
+                                GUILayout.Label(ReasonInRussian(reason), skin.Tiny);
                         }
-                        catch (Exception ex) { lastMessage = ex.Message; Logger.LogError(ex); }
+                        else GUILayout.Label("ИЗУЧЕНО", skin.Header);
+                        GUILayout.EndVertical();
+                        GUILayout.Space(5);
                     }
-                    GUI.enabled = true;
-                    if (!canBuy) GUILayout.Label("Недоступно: " + reason);
                 }
+                finally { GUILayout.EndScrollView(); }
+
+                if (GUILayout.Button(showDiagnostics ? "Скрыть диагностику" : "Информация и диагностика",
+                    skin.Button, GUILayout.Height(29))) showDiagnostics = !showDiagnostics;
+                if (showDiagnostics)
+                {
+                    GUILayout.Label(rosterStatus, skin.Tiny);
+                    GUILayout.Label("Текстура из игры: " + (skin.UsingGameSprite ? "найдена" : "не найдена, используется запасная"), skin.Tiny);
+                    GUILayout.Label("Применение статов: " + (experimentalStatInjection.Value ? "тестовое" : "отключено"), skin.Tiny);
+                    if (currentHero != null)
+                    {
+                        if (GUILayout.Button("Попробовать применить купленные бонусы к герою", skin.Button))
+                            ApplyCurrentBonuses();
+                    }
+                    else GUILayout.Label("Сначала начни новый забег: герой ещё не обнаружен", skin.Tiny);
+                    if (enableTestRewards.Value)
+                    {
+                        if (GUILayout.Button("DEV: +100 опыта", skin.Button))
+                        {
+                            try
+                            {
+                                if (progression.GrantExperience("dev:" + Guid.NewGuid().ToString("N"), 100))
+                                {
+                                    store.Save(progression.Profile);
+                                    lastMessage = "Добавлено 100 тестового опыта";
+                                }
+                            }
+                            catch (Exception ex) { lastMessage = ex.Message; Logger.LogError(ex); }
+                        }
+                    }
+                    GUILayout.Label("Особые навыки пока не прикреплены к боевой панели. Установленные ранги сохраняются.", skin.Tiny);
+                }
+                if (!string.IsNullOrWhiteSpace(lastMessage))
+                    GUILayout.Label(lastMessage, skin.Header);
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button("Свернуть", skin.Button, GUILayout.MinHeight(29)))
+                    visible = false;
+                GUILayout.EndHorizontal();
             }
-            GUILayout.EndScrollView();
-            GUILayout.Label(lastMessage);
-            if (GUILayout.Button("Закрыть (F8 / F9 / Home)")) visible = false;
-            GUILayout.EndVertical();
+            catch (Exception e)
+            {
+                Logger.LogError("Eternal Hero DrawWindow failed: " + e);
+                GUILayout.Label("Ошибка интерфейса: проверь BepInEx/LogOutput.log", skin.Warning);
+            }
+            finally { GUILayout.EndVertical(); }
             GUI.DragWindow(new Rect(0, 0, bounds.width, 24));
+        }
+
+        private static string ReasonInRussian(string reason)
+        {
+            switch (reason)
+            {
+                case "Not enough essence": return "Недостаточно эссенции";
+                case "Prerequisite not met": return "Сначала изучи предыдущий талант";
+                case "Already max rank": return "Максимальный ранг";
+                default: return reason ?? "";
+            }
+        }
+
+        private void ApplyCurrentBonuses()
+        {
+            if (!experimentalStatInjection.Value)
+            {
+                lastMessage = "В настройках включи Experimental > ApplyStatBonuses = true, если согласен тестировать на отдельном сохранении";
+                return;
+            }
+            try
+            {
+                int applied = HeroRuntime.TryApplyBonuses(
+                    currentHero, progression.CalculatedStatBonuses(), Logger);
+                lastMessage = "Изменено характеристик: " + applied +
+                    ". Проверь характеристики ГГ и BepInEx/LogOutput.log";
+                Logger.LogInfo(lastMessage);
+            }
+            catch (Exception ex) { lastMessage = ex.Message; Logger.LogError(ex); }
         }
 
         private void OnDestroy()
