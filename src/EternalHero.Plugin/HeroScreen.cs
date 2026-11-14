@@ -325,7 +325,7 @@ namespace EternalHero.Plugin
             Action(rightPane,"PrevRace",35,288,70,52,"◀",()=>{
                 selected=(selected-1+races.Count)%races.Count;p.HeroRaceId=races[selected];Save();Rebuild();
             });
-            Label(rightPane,FormatRace(p.HeroRaceId),115,286,350,55,25,parchment,TextAnchor.MiddleCenter,true);
+            Label(rightPane,GameBridge.RaceName(p.HeroRaceId),115,286,350,55,25,parchment,TextAnchor.MiddleCenter,true);
             Action(rightPane,"NextRace",471,288,70,52,"▶",()=>{
                 selected=(selected+1)%races.Count;p.HeroRaceId=races[selected];Save();Rebuild();
             });
@@ -382,8 +382,9 @@ namespace EternalHero.Plugin
                 int y=9+i*74;i++;
                 Image(scroll,"TraitCard",10,y,901,65,card);
                 Label(scroll,trait.Name,25,y+5,620,27,19,chosen?gold:parchment,TextAnchor.MiddleLeft,true);
-                Label(scroll,"Цена черты в базовой игре: "+trait.Cost+
-                    (forbidden?"  •  НЕСОВМЕСТИМА С РАСОЙ":""),25,y+34,630,24,14,muted);
+                Label(scroll,(!string.IsNullOrEmpty(trait.Description) ? trait.Description + "   •   " : "") +
+                    "Цена: "+trait.Cost+
+                    (forbidden?"  •  НЕСОВМЕСТИМА С РАСОЙ":""),25,y+34,670,24,14,muted);
                 var chosenTrait=trait;
                 var b=Action(scroll,"Trait-"+trait.Id,700,y+10,197,44,
                     chosen?"УБРАТЬ":"ВЫБРАТЬ",()=>{
