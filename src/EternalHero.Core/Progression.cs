@@ -12,6 +12,13 @@ namespace EternalHero.Core
         [DataMember] public int SchemaVersion { get; set; } = 1;
         [DataMember] public string HeroId { get; set; } = "eternal-hero";
         [DataMember] public string HeroName { get; set; } = "Вечный защитник";
+        [DataMember] public string HeroRaceId { get; set; } = "Human";
+        [DataMember] public string HeroGender { get; set; } = "Male";
+        [DataMember] public string HeroFaceId { get; set; } = "";
+        [DataMember] public string PortraitCode { get; set; } = "";
+        [DataMember] public bool CreationConfirmed { get; set; }
+        [DataMember] public List<string> SelectedTraits { get; set; } = new List<string>();
+        [DataMember] public bool StarterEssenceGranted { get; set; }
         [DataMember] public long LifetimeExperience { get; set; }
         [DataMember] public long EarnedEssence { get; set; }
         [DataMember] public int AvailableEssence { get; set; }
@@ -103,6 +110,8 @@ namespace EternalHero.Core
             if (profile.SchemaVersion != 1) throw new NotSupportedException("Unsupported profile format");
             if (profile.Ranks == null) profile.Ranks = new Dictionary<string, int>();
             if (profile.ClaimedRewardIds == null) profile.ClaimedRewardIds = new HashSet<string>();
+            if (profile.SelectedTraits == null) profile.SelectedTraits = new List<string>();
+            if (profile.Appearance == null) profile.Appearance = new Dictionary<string, string>();
         }
 
         public int Rank(string upgradeId) =>
