@@ -18,6 +18,21 @@ jobs:
         run: dotnet run --project tests/EternalHero.Tests/EternalHero.Tests.csproj --configuration Release
       - name: Build BepInEx plugin
         run: dotnet build src/EternalHero.Plugin/EternalHero.Plugin.csproj --configuration Release
+      - name: Validate optional ModKit skills
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          ids=set()
+          for name in glob.glob('ModKit/Skills/*.patch.xml'):
+              root=ET.parse(name).getroot()
+              assert root.tag=='Patch' and root.attrib['target']=='SkillDefinition'
+              assert root.attrib['action']=='add'
+              inner=root.find('./Definition/SkillDefinition')
+              assert inner is not None and inner.attrib['Id']==root.attrib['id']
+              ids.add(inner.attrib['Id'])
+          assert ids=={'EternalGhostShot','EternalEtherSlash','EternalArcanePulse'}, ids
+          print('All special skill XML patches are valid')
+          PY
       - name: Package prototype DLLs
         shell: bash
         run: |
@@ -25,6 +40,9 @@ jobs:
           cp src/EternalHero.Plugin/bin/Release/netstandard2.0/EternalHero.Plugin.dll package/BepInEx/plugins/EternalHero/
           cp src/EternalHero.Core/bin/Release/netstandard2.0/EternalHero.Core.dll package/BepInEx/plugins/EternalHero/
           cp docs/INSTALL.md package/INSTALL.md
+          mkdir -p package/BepInEx/plugins/EternalHero/ModKit/Skills
+          cp ModKit/Skills/*.patch.xml package/BepInEx/plugins/EternalHero/ModKit/Skills/
+          cp ModKit/languages.csv package/BepInEx/plugins/EternalHero/ModKit/
           cd package
           zip -r ../EternalHero-prototype.zip BepInEx INSTALL.md
       - uses: actions/upload-artifact@v4
