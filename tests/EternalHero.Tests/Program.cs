@@ -54,6 +54,13 @@ internal static class Program
             Check(next.Profile.RunsStarted == 2, "run counter persisted");
             Check(next.Profile.Victories == 1, "victory counter persisted");
             Check(next.Profile.BossesDefeated == 1, "boss counter persisted");
+            next.Profile.Appearance["self/Gender"] = "Female";
+            next.Profile.HeroName = "Альтаир";
+            store.Save(next.Profile);
+            var appearance = store.Load();
+            Check(appearance.Appearance["self/Gender"] == "Female", "appearance markers survive save and load");
+            Check(appearance.HeroName == "Альтаир", "hero name survives save and load");
+            Check(appearance.RunsStarted == 2, "run identity survives appearance save");
             Console.WriteLine("ALL PROGRESSION TESTS PASSED");
         }
         finally
