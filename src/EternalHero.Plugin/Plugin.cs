@@ -15,7 +15,7 @@ namespace EternalHero.Plugin
     public sealed class Plugin : BaseUnityPlugin
     {
         internal const string Id = "domenklay.tls.eternalhero";
-        internal const string Version = "0.2.0";
+        internal const string Version = "0.3.0";
         internal static Plugin Instance;
         private Harmony harmony;
         private ProfileStore store;
@@ -25,6 +25,8 @@ namespace EternalHero.Plugin
         private object currentHero;
         private int activeTab;
         private bool showDiagnostics;
+        private int appearanceFields;
+        private string identityStatus = "Герой ещё не определён";
         private readonly string[] branchNames = {
             "Стальное тело", "Мастер оружия", "Тактический гений", "Наследие", "Запретные техники"
         };
@@ -110,6 +112,14 @@ namespace EternalHero.Plugin
 
                 rosterStatus = "Candidate first hero: " + hero.GetType().FullName;
                 currentHero = hero;
+                bool captured;
+                appearanceFields = HeroIdentity.CaptureOrRestore(progression.Profile, hero, out captured);
+                identityStatus = captured
+                    ? "Запомнены параметры внешности: " + appearanceFields
+                    : "Восстановлены параметры внешности: " + appearanceFields;
+                if (captured)
+                    store.Save(progression.Profile);
+                Logger.LogInfo("Eternal Hero appearance: " + identityStatus);
                 var named = HeroRuntime.TrySetHeroName(hero, progression.Profile.HeroName);
                 Logger.LogInfo("Identified starting hero; fixed name applied: " + named +
                     "; type=" + hero.GetType().FullName);
@@ -248,7 +258,7 @@ namespace EternalHero.Plugin
                     foreach (var upgrade in UpgradeCatalog.All.Where(u => u.Branch == branchNames[activeTab]))
                     {
                         int rank = progression.Rank(upgrade.Id);
-                        GUILayout.BeginVertical(GUI.skin.box);
+                        GUILayout.BeginVertical(skin.Card);
                         GUILayout.BeginHorizontal();
                         GUILayout.Label(upgrade.Name, skin.Header);
                         GUILayout.FlexibleSpace();
@@ -295,6 +305,8 @@ namespace EternalHero.Plugin
                 if (showDiagnostics)
                 {
                     GUILayout.Label(rosterStatus, skin.Tiny);
+                    GUILayout.Label(identityStatus, skin.Tiny);
+                    GUILayout.Label("Игровой статус навыков: определения XML есть; привязка к ГГ ещё не сделана", skin.Tiny);
                     GUILayout.Label("Текстура из игры: " + (skin.UsingGameSprite ? "найдена" : "не найдена, используется запасная"), skin.Tiny);
                     GUILayout.Label("Применение статов: " + (experimentalStatInjection.Value ? "тестовое" : "отключено"), skin.Tiny);
                     if (currentHero != null)
