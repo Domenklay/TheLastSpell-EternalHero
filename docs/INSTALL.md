@@ -1,4 +1,4 @@
-# Установка прототипа v0.1
+# Установка прототипа v0.1.1
 
 **Это технический прототип**, а не завершённая игровая модификация. Сначала сделайте резервные копии сохранений The Last Spell.
 
@@ -7,7 +7,7 @@
 3. Внутри артефакта находится \`EternalHero-prototype.zip\`. Распакуйте его содержимое в папку игры так, чтобы получилось:
    - \`The Last Spell/BepInEx/plugins/EternalHero/EternalHero.Plugin.dll\`
    - \`The Last Spell/BepInEx/plugins/EternalHero/EternalHero.Core.dll\`
-4. Запустите игру и нажмите **F8**. Появится окно метапрогрессии.
+4. Запустите игру: окно метапрогрессии должно **открыться само**, а справа сверху появится кнопка **Eternal Hero - OPEN/CLOSE**. Можно нажать **F8**, **F9** или **Home**. Это исправление для клавиатур, на которых F8 не определяется.
 5. В логах \`BepInEx/LogOutput.log\` найдите строки \`Eternal Hero\` и \`Patched PlayableUnitManager.CreateStartUnits\`.
 6. Начните **новую** игру, убедитесь, что стартовый ростер работает и в логе отражено определение кандидата на ГГ.
 
@@ -31,3 +31,15 @@
 \`dotnet build src/EternalHero.Plugin/EternalHero.Plugin.csproj -c Release\`
 
 Используются общедоступные зависимости NuGet (BepInEx, HarmonyX, UnityEngine.Modules).
+
+## Если окно не появляется
+
+1. Убедитесь в `BepInEx/LogOutput.log`, что присутствует `Eternal Hero v0.1.1 loaded`.
+2. Там же проверьте `Eternal Hero OnGUI reached`: это подтверждает выполнение отрисовки интерфейса.
+3. Если строчки `OnGUI reached` нет, пришлите весь лог — ошибка может возникать до отрисовки.
+4. Если есть ошибка `Eternal Hero OnGUI error`, пришлите её целиком.
+5. Если кнопки нет, нажмите `F9` или `Home`; убедитесь, что файл `EternalHero.Plugin.dll` заменён на DLL версии 0.1.1.
+6. В `BepInEx/config/domenklay.tls.eternalhero.cfg` настройки `OpenMenuOnStartup` и `ShowLauncherButton` по умолчанию равны `true`.
+7. При установке поверх старой версии перезапишите обе DLL, не оставляя второй копии мода в других подпапках `plugins`.
+
+**Примечание:** F8 иногда требует `Fn+F8`. Но даже без клавиатуры окно версии 0.1.1 должно быть доступно мышью.
