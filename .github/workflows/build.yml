@@ -1,0 +1,34 @@
+name: Build Eternal Hero prototype
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Test progression engine
+        run: dotnet run --project tests/EternalHero.Tests/EternalHero.Tests.csproj --configuration Release
+      - name: Build BepInEx plugin
+        run: dotnet build src/EternalHero.Plugin/EternalHero.Plugin.csproj --configuration Release
+      - name: Package prototype DLLs
+        shell: bash
+        run: |
+          mkdir -p package/BepInEx/plugins/EternalHero
+          cp src/EternalHero.Plugin/bin/Release/netstandard2.0/EternalHero.Plugin.dll package/BepInEx/plugins/EternalHero/
+          cp src/EternalHero.Core/bin/Release/netstandard2.0/EternalHero.Core.dll package/BepInEx/plugins/EternalHero/
+          cp docs/INSTALL.md package/INSTALL.md
+          cd package
+          zip -r ../EternalHero-prototype.zip BepInEx INSTALL.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EternalHero-prototype
+          path: EternalHero-prototype.zip
+          if-no-files-found: error
