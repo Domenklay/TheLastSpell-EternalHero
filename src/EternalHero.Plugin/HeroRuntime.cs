@@ -13,7 +13,8 @@ namespace EternalHero.Plugin
     {
         private static readonly BindingFlags Flags =
             BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
-        private static readonly ConditionalWeakTable<object, object> Patched = new ConditionalWeakTable<object, object>();
+        private static readonly ConditionalWeakTable<object, Dictionary<string, float>> Patched =
+            new ConditionalWeakTable<object, Dictionary<string, float>>();
 
         private static object Member(object instance, string name)
         {
@@ -103,43 +104,119 @@ namespace EternalHero.Plugin
             return false;
         }
 
+        internal static string DiagnosticStatSurface(object hero)
+        {
+            if (hero == null) return "hero not found";
+            try
+            {
+                var sources = StatSources(hero).ToArray();
+                return string.Join(" | ", sources.Select(s =>
+                {
+                    var methods = s.GetType().GetMethods(Flags)
+                        .Where(m => m.Name.IndexOf("Stat", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                                    (m.Name.IndexOf("Increase", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                     m.Name.IndexOf("Add", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                     m.Name.IndexOf("Modify", StringComparison.OrdinalIgnoreCase) >= 0))
+                        .Select(m => m.Name + "(" + string.Join(",",
+                            m.GetParameters().Select(p => p.ParameterType.Name).ToArray()) + ")")
+                        .Distinct().Take(16);
+                    return s.GetType().Name + ": " + string.Join("; ", methods.ToArray());
+                }).ToArray());
+            }
+            catch (Exception e) { return "Diagnostic failed: " + e.Message; }
+        }
+
+        private static IEnumerable<object> StatSources(object hero)
+        {
+            string[] names = { "UnitStatsController", "StatsController", "Stats", "UnitStats",
+                "UnitStatsData", "PlayableUnitStats", "Unit", "Controller" };
+            var seen = new HashSet<object>(ReferenceComparer.Instance);
+            foreach (var name in names)
+            {
+                object nested = Member(hero, name);
+                if (nested != null && seen.Add(nested)) yield return nested;
+            }
+            if (seen.Add(hero)) yield return hero;
+        }
+
+        private static string GameStatName(string id)
+        {
+            // Use game XML stat IDs wherever they are known, fall back to original ID.
+            switch (id)
+            {
+                case "Health": return "HealthTotal";
+                case "SkillRange": return "Range";
+                default: return id;
+            }
+        }
+
+        // Conservative bridge. Refuses unknown stat API signatures and changes only named stats.
+        // Per-hero delta tracking protects against double applying in the same runtime instance.
         internal static int TryApplyBonuses(object hero, IReadOnlyDictionary<string, float> bonuses, ManualLogSource log)
         {
             if (hero == null || bonuses == null || bonuses.Count == 0) return 0;
-            if (Patched.TryGetValue(hero, out _)) return 0; // avoid double-applying on same object
-            int applied = 0;
-            var controller = Member(hero, "UnitStatsController") ??
-                             Member(hero, "StatsController") ??
-                             Member(hero, "Stats") ?? hero;
-            var method = controller.GetType().GetMethods(Flags)
-                .FirstOrDefault(m => m.Name == "IncreaseBaseStat" &&
-                    m.GetParameters().Length == 4 && m.GetParameters()[0].ParameterType.IsEnum
-                    && m.GetParameters()[1].ParameterType == typeof(float) &&
-                    m.GetParameters()[2].ParameterType == typeof(bool) &&
-                    m.GetParameters()[3].ParameterType == typeof(bool));
-            if (method == null)
+            if (!Patched.TryGetValue(hero, out var already))
             {
-                log.LogWarning("No compatible IncreaseBaseStat on " + controller.GetType().FullName);
-                return 0;
+                already = new Dictionary<string, float>();
+                Patched.Add(hero, already);
             }
-            foreach (var kv in bonuses)
+            foreach (var controller in StatSources(hero))
             {
-                try
+                var candidates = controller.GetType().GetMethods(Flags)
+                    .Where(m => m.Name == "IncreaseBaseStat" || m.Name == "AddBaseStat")
+                    .Where(m => m.GetParameters().Length == 4 &&
+                         m.GetParameters()[0].ParameterType.IsEnum &&
+                         (m.GetParameters()[1].ParameterType == typeof(float) ||
+                          m.GetParameters()[1].ParameterType == typeof(int)) &&
+                         m.GetParameters()[2].ParameterType == typeof(bool) &&
+                         m.GetParameters()[3].ParameterType == typeof(bool))
+                    .ToArray();
+                if (candidates.Length != 1) continue; // no guesses on ambiguous overloads
+                var method = candidates[0];
+                var args = method.GetParameters();
+                var enumType = args[0].ParameterType;
+                int changed = 0;
+                foreach (var kv in bonuses)
                 {
-                    var enumType = method.GetParameters()[0].ParameterType;
-                    if (!Enum.IsDefined(enumType, kv.Key))
+                    try
                     {
-                        log.LogWarning("Missing game stat enum: " + kv.Key);
-                        continue;
+                        string gameName = GameStatName(kv.Key);
+                        if (!Enum.IsDefined(enumType, gameName))
+                        {
+                            log.LogWarning("Eternal Hero: game stat does not exist: " + gameName);
+                            continue;
+                        }
+                        already.TryGetValue(kv.Key, out var applied);
+                        float diff = kv.Value - applied;
+                        if (diff <= .001f) continue;
+                        object numeric = args[1].ParameterType == typeof(int) ?
+                            (object)Convert.ToInt32(diff) : diff;
+                        method.Invoke(controller, new object[] {
+                            Enum.Parse(enumType, gameName), numeric, false, true
+                        });
+                        already[kv.Key] = kv.Value;
+                        changed++;
                     }
-                    var gameStat = Enum.Parse(enumType, kv.Key);
-                    method.Invoke(controller, new object[] { gameStat, kv.Value, false, true });
-                    applied++;
+                    catch (Exception e)
+                    {
+                        log.LogWarning("Eternal Hero: stat " + kv.Key +
+                            " could not be applied: " + e.GetBaseException().Message);
+                    }
                 }
-                catch (Exception e) { log.LogWarning("Stat " + kv.Key + " not applied: " + e.Message); }
+                log.LogInfo("Stat bridge: " + controller.GetType().FullName +
+                    "." + method.Name + " / changed=" + changed);
+                return changed;
             }
-            if (applied > 0) Patched.Add(hero, new object());
-            return applied;
+            log.LogWarning("Eternal Hero: compatible stat mutation API was not found: " +
+                DiagnosticStatSurface(hero));
+            return 0;
+        }
+
+        private sealed class ReferenceComparer : IEqualityComparer<object>
+        {
+            internal static readonly ReferenceComparer Instance = new ReferenceComparer();
+            public new bool Equals(object a, object b) => ReferenceEquals(a, b);
+            public int GetHashCode(object value) => RuntimeHelpers.GetHashCode(value);
         }
     }
 }
