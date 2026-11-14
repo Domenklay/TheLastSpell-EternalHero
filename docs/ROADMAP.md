@@ -1,50 +1,30 @@
-# Eternal Hero — design & development roadmap
+# Eternal Hero: Development Roadmap
 
-## Игровые правила (утверждённый базовый вариант)
-- Один главный герой занимает **один слот из трёх** стандартных стартовых персонажей.
-- В каждом забеге обычный игровой уровень ГГ сбрасывается к начальному.
-- Метауровни, черты, особые приёмы и накопленная эссенция сохраняются в отдельном профиле.
-- Остальные персонажи играют по стандартным правилам.
-- Любые оружия доступны ГГ по общим правилам игры, без искусственной блокировки.
-- Не создавать предметы, черты, новые материалы без необходимости; использовать существующие где возможно.
-- UI на русском; на первых этапах F8, позже встроенный игровой экран.
+## Requirements
+- A recurring protagonist takes the first starting roster slot.
+- Normal levels reset between runs; permanent upgrades do not.
+- Any vanilla weapon is usable.
+- Permanently stronger than normal recruits via extra stats, vanilla traits/perks and weapon-independent skills.
 
-## Направления прокачки
-| Ветка | Примеры |
-|---|---|
-| Стальное тело | HP, броня, блок, сопротивление |
-| Мастер оружия | физический / дальний / магический урон, крит |
-| Тактический гений | скорость движения, дальность, очки действий |
-| Наследие | дополнительные существующие черты и перки |
-| Запретные техники | атаки без соответствующего оружия |
+## Implemented and unit-tested
+- [x] Profile saving, backups, existing save compatibility
+- [x] Five metaprogression branches with 17 ranked upgrades
+- [x] Dark game-like UI, tabs, RPG progress bar, optional in-game sprite reuse
+- [x] Starting roster hook, best-effort capture/restore of identity properties
+- [x] First-character one-time gift: +100 XP
+- [x] Run reward ledger for night/boss/win/loss, duplicate protection (standalone tests)
+- [x] Three XML skill definitions and Russian localization for optional TLS.ModKit
+- [x] Diagnostics for game stat/trait/perk/skill methods, plus build CI
 
-Приобретения и зависимости уже реализованы в EternalHero.Core. Проекции на игровые статы требуют проверки.
+## Not completed, requires real game API validation
+- [ ] Guarantee first hero identity/portrait on new runs and save reloads
+- [ ] Bind earned meta-XP to actual night events, bosses and win/loss
+- [ ] Apply meta stats safely without duplication
+- [ ] Grant existing game traits and perks to protagonist only
+- [ ] Bind three special skills to hotbar without weapon requirements
+- [ ] True native Unity UI prefab integration; current UI is styled IMGUI with game sprite lookup
+- [ ] Verify custom skill definitions parse in the installed ModKit
+- [ ] Resolution and localization QA, compatibility with game updates
 
-## Особые навыки (технические проекты, НЕ рабочие умения пока)
-1. **Призрачный выстрел**: 1 AP, 3 маны, дальность 3–7 клеток, одиночный физический/дальний удар, cooldown 3 хода. Игровую анимацию и ограничения ещё нужно изучить.
-2. **Эфирный клинок**: 2 AP, 4 маны, удар по трём соседним клеткам, cooldown 3 хода.
-3. **Пульс арканы**: 2 AP, 6 маны, магический урон по небольшой области, cooldown 4 хода.
-
-Принцип: не выдавать невидимое оружие как постоянный слот, а создавать собственный skill/effect, который присоединяется к ГГ и проверяет требования без экипированного оружия. Исследовать TLS.ModKit Skills и вызовы skill-controller в игре; реализовать после проверки API.
-
-## Этапы
-- [x] Создать репозиторий и ядро постоянного профиля
-- [x] Ветки, ранги, цены, условия и тестовые награды
-- [x] Резервное сохранение данных и проверка дублей наград
-- [x] CI подтверждает сборку DLL и тестов (GitHub Actions — успешный прогон)
-- [ ] Подтвердить хук CreateStartUnits и подбор первого героя в текущем билде игры
-- [ ] Фиксировать идентичность ГГ: имя, портрет, внешность, безопасное восстановление при загрузке
-- [ ] Добавить гарантированное появление того же ГГ на старте каждого нового забега
-- [ ] Уточнить и подключить реальный stat-controller, без дублирования бонусов при сохранениях
-- [ ] Определить ночные/финальные события и начислять метаопыт строго один раз за событие
-- [ ] Применять имеющиеся черты и перки только к ГГ
-- [ ] Проверить возможность skills без оружия и создать «Призрачный выстрел»
-- [ ] Стабилизировать боевой UI и защиту от конфликтов с другими модами
-- [ ] Интегрировать родной графический экран метапрогрессии
-
-## Нужные материалы для этапа интеграции
-- Номер версии The Last Spell из главного меню.
-- Лог \`BepInEx/LogOutput.log\` после первого входа в бой и после запуска нового забега.
-- При отсутствии в логах необходимого API можно выполнить локальную инспекцию собственного \`TheLastStand.dll\` с ILSpy — игровой файл никуда публиковать не требуется.
-
-Неподтверждённые методы не следует маскировать как готовые функции.
+## What to provide for next integration
+After loading a NEW RUN, submit BepInEx/LogOutput.log and a screenshot showing hero stats/portrait. Also note whether TLS.ModKit is installed. Do not upload proprietary game DLLs to the public repository.

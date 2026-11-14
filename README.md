@@ -1,27 +1,19 @@
-# The Last Spell — Eternal Hero / Вечный защитник
+# Eternal Hero — Вечный защитник
 
 [![Build](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml/badge.svg)](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
 
-**v0.1.1 technical prototype** for BepInEx 5 x64. The goal is one recurring protagonist with an independent, persistent metaprogression tree.
+## Version 0.3 — playable UI and metaprogression test build
 
-## Current working components
-- Game-independent progression engine: five branches, 17 upgrades, rank limits and prerequisites.
-- Purchases, experience → essence conversion, duplicate-reward prevention.
-- Local JSON profile + backup on subsequent saves.
-- In-game progression panel opens automatically on startup; top-right OPEN/CLOSE button, F8/F9/Home shortcuts; optional debug XP button.
-- Harmony hook for `PlayableUnitManager.CreateStartUnits` and diagnostic attempt to find the first starting character.
-- Automated GitHub Actions tests and compilation of `EternalHero.Core.dll` and `EternalHero.Plugin.dll`.
+This is a BepInEx 5 mod prototype for The Last Spell. It is not yet the complete permanent-protagonist gameplay feature.
 
-**Not yet implemented/verified:** automatic experience from the game, reliable fixed identity across runs, safe automatic application of stat bonuses, persistent perks/traits and weapon-independent active combat abilities. The runtime bridge is experimental and stat injection is OFF by default.
+**Implemented:** Five tabs with 17 purchasable permanent upgrades, separate JSON profile with a backup, game-styled menu, loaded-game UI sprite lookup (with its own fallback skin), an initial 100 XP / one essence gift after the first hero is found, best-effort capture and restore of character appearance properties, tested run reward ledger, debug diagnostics for game stats and ability APIs. An experimental stat bridge is opt-in only.
 
-## Download / install
-[Latest successful build](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml) → open run → **Artifacts → EternalHero-prototype**. The downloaded artifact includes an installable ZIP with both DLLs. GitHub may require signing in to download workflow artifacts.
+**Skill definitions:** Three custom XML skills (EternalGhostShot, EternalEtherSlash, EternalArcanePulse) with Russian names. Requires [TLS.ModKit](https://github.com/stunl0ck/tls-modkit) to load the XML. They are NOT yet granted to the hero automatically.
 
-See [Russian installation instructions](docs/INSTALL.md) and [feature roadmap](docs/ROADMAP.md).
+**Still under development:** Guaranteed same portrait and body across runs, automatic real-night rewards, safe automatic game-stat bonuses, actual grants of existing traits/perks, and weapon-independent active skills on the combat hotbar.
 
-## Building
-- .NET SDK 8, NuGet restore (the BepInEx feed is configured in `NuGet.Config`).
-- `dotnet run --project tests/EternalHero.Tests/EternalHero.Tests.csproj -c Release`
-- `dotnet build src/EternalHero.Plugin/EternalHero.Plugin.csproj -c Release`
+[Download the latest successful artifact](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
 
-The project does not publish proprietary game DLLs or redistribute third-party mod assets.
+See [Install instructions](docs/INSTALL.md) and [Roadmap](docs/ROADMAP.md).
+
+No copyrighted game binaries, portraits or textures are distributed. The game itself supplies UI sprites when available at runtime.
