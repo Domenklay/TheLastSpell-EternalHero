@@ -120,6 +120,33 @@ namespace EternalHero.Plugin
                 if (captured)
                     store.Save(progression.Profile);
                 Logger.LogInfo("Eternal Hero appearance: " + identityStatus);
+                var stableId = HeroRunIdentity.TryGetStableHeroId(hero);
+                if (!string.IsNullOrWhiteSpace(stableId))
+                {
+                    bool isNewRun = runRewards.Begin(stableId);
+                    if (isNewRun) store.Save(progression.Profile);
+                    Logger.LogInfo("Eternal Hero provisional run key: " + stableId +
+                        "; new run=" + isNewRun + "; requires reload/new-run verification");
+                    rosterStatus += "; provisional run key found";
+                }
+                else
+                {
+                    Logger.LogWarning("Eternal Hero could not resolve stable game run ID. " +
+                        "Automatic per-run XP disabled until game API verified.");
+                    rosterStatus += "; no stable run key";
+                }
+                if (!progression.Profile.FirstRunGiftClaimed)
+                {
+                    // One-time onboarding grant; never repeat on game restarts.
+                    if (progression.GrantExperience("career:welcome-v1", 100))
+                    {
+                        progression.Profile.FirstRunGiftClaimed = true;
+                        store.Save(progression.Profile);
+                        lastMessage = "Первый дар наследия: +100 опыта (1 эссенция)";
+                        Logger.LogInfo("Eternal Hero: first-run legacy gift awarded once");
+                    }
+                }
+
                 var named = HeroRuntime.TrySetHeroName(hero, progression.Profile.HeroName);
                 Logger.LogInfo("Identified starting hero; fixed name applied: " + named +
                     "; type=" + hero.GetType().FullName);
@@ -306,6 +333,9 @@ namespace EternalHero.Plugin
                 {
                     GUILayout.Label(rosterStatus, skin.Tiny);
                     GUILayout.Label(identityStatus, skin.Tiny);
+                    GUILayout.Label("Привязка забега: " +
+                        (string.IsNullOrWhiteSpace(progression.Profile.CurrentRunId) ? "не обнаружена" :
+                         "обнаружен предварительный идентификатор"), skin.Tiny);
                     GUILayout.Label("Игровой статус навыков: определения XML есть; привязка к ГГ ещё не сделана", skin.Tiny);
                     GUILayout.Label("Текстура из игры: " + (skin.UsingGameSprite ? "найдена" : "не найдена, используется запасная"), skin.Tiny);
                     GUILayout.Label("Применение статов: " + (experimentalStatInjection.Value ? "тестовое" : "отключено"), skin.Tiny);
