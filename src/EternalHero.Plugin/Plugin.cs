@@ -14,7 +14,7 @@ namespace EternalHero.Plugin
     public sealed class Plugin : BaseUnityPlugin
     {
         internal const string Id = "domenklay.tls.eternalhero";
-        internal const string Version = "0.6.0";
+        internal const string Version = "0.7.0";
 
         private Harmony harmony;
         private ProfileStore store;
@@ -220,12 +220,23 @@ namespace EternalHero.Plugin
 
         private static void AfterNativeAppearanceSaved(object __instance)
         {
-            if (Instance == null || Instance.currentHero == null) return;
+            if (Instance == null || Instance.Profile == null) return;
             object edited = GameBridge.Get(__instance, "playableUnit");
-            if (!ReferenceEquals(edited, Instance.currentHero)) return;
+            if (edited == null) return;
+            object first = GameBridge.FirstHero();
+            // Match against the first unit even when the manager's post-start hook missed.
+            if (!ReferenceEquals(edited, Instance.currentHero) &&
+                !ReferenceEquals(edited, first))
+            {
+                Instance.Logger.LogInfo("Eternal Hero: customization belongs to another character, skipped");
+                return;
+            }
+            Instance.currentHero = edited;
             GameBridge.CaptureEditorResult(Instance.currentHero, Instance.Profile);
             Instance.SaveProfile();
-            Instance.Logger.LogInfo("Eternal Hero: native portrait, gender and name saved to profile.");
+            Instance.Logger.LogInfo("Eternal Hero: native portrait saved, code length=" +
+                (Instance.Profile.PortraitCode?.Length ?? 0) + ", face=" +
+                Instance.Profile.HeroFaceId + ", gender=" + Instance.Profile.HeroGender);
             Instance.screen?.Open();
             Instance.screen?.Notify("Облик героя сохранён и будет применён в новых забегах");
         }

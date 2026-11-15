@@ -26,8 +26,10 @@ namespace EternalHero.Plugin
                     try { types = assembly.GetTypes(); }
                     catch (ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }
                     catch { continue; }
-                    generator = generator ?? types.FirstOrDefault(t => t.Name == "CodeGenerator");
-                    api = api ?? types.FirstOrDefault(t => t.Name == "PortraitAPIManager");
+                    generator = generator ?? types.FirstOrDefault(t => t.Name == "CodeGenerator" &&
+                        t.GetMethods(Static).Any(m => m.Name == "TryDecode"));
+                    api = api ?? types.FirstOrDefault(t => t.Name == "PortraitAPIManager" &&
+                        t.GetMethods(Static).Any(m => m.Name == "GeneratePortrait"));
                     if (generator != null && api != null) break;
                 }
                 var decode = generator?.GetMethods(Static).FirstOrDefault(m =>
@@ -37,7 +39,12 @@ namespace EternalHero.Plugin
                 if (decode == null) { log.LogWarning("Eternal Hero: portrait code decoder not found"); return false; }
                 var codeType = decode.GetParameters()[1].ParameterType.GetElementType();
                 object[] args = { profile.PortraitCode, Activator.CreateInstance(codeType) };
-                if (!(decode.Invoke(null, args) is bool valid) || !valid) return false;
+                if (!(decode.Invoke(null, args) is bool valid) || !valid)
+                {
+                    log.LogWarning("Eternal Hero: saved portrait code was not decoded (length=" +
+                        profile.PortraitCode.Length + ")");
+                    return false;
+                }
                 var generatorMethod = api?.GetMethods(Static).FirstOrDefault(m =>
                     m.Name == "GeneratePortrait" && m.GetParameters().Length == 1 &&
                     m.GetParameters()[0].ParameterType == codeType);
@@ -52,6 +59,7 @@ namespace EternalHero.Plugin
                 if (!string.IsNullOrWhiteSpace(profile.HeroFaceId))
                     GameBridge.Set(hero, "FaceId", profile.HeroFaceId);
                 if (result) GameBridge.RefreshHeroPresentation(hero, log);
+                else log.LogWarning("Eternal Hero: portrait generated but no writable hero fields found.");
                 log.LogInfo("Eternal Hero portrait restored from native game code: " + result);
                 return result;
             }

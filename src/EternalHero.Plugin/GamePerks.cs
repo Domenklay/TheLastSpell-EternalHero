@@ -33,21 +33,48 @@ namespace EternalHero.Plugin
 
         // Uses the same PerkController/native-perk path as the game's existing Glyph perks.
         // Never unlocks the perks of companions.
+        internal static bool UnlockAllTiers(object hero, HeroProfile profile, ManualLogSource log)
+        {
+            if (hero == null || profile == null || !profile.UnlockAllPerkTiers) return false;
+            try
+            {
+                // The Last Spell's controller already provides a tier-unlock operation.
+                object tree = GameBridge.Get(hero, "PerkTree");
+                object controller = GameBridge.Get(tree, "UnitPerkTreeController");
+                if (controller == null) return false;
+                var method = controller.GetType().GetMethod("DebugUpdateAllTiersAvailability",
+                    System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.Public |
+                    System.Reflection.BindingFlags.NonPublic);
+                if (method == null) return false;
+                method.Invoke(controller, null);
+                return true;
+            }
+            catch (Exception e)
+            {
+                log.LogWarning("Eternal Hero unlock all perk tiers failed: " + e.GetBaseException().Message);
+                return false;
+            }
+        }
+
         internal static string Grant(object hero, HeroProfile profile, ManualLogSource log)
         {
             if (hero == null || profile == null) return "no hero";
+            UnlockAllTiers(hero, profile, log);
             var selected = profile.SelectedPerks;
             if (selected == null || selected.Count == 0) return "no permanent perks selected";
             var db = GameBridge.StaticGet(Database, "PerkDefinitions") as IDictionary;
             if (db == null) return "perk database unavailable";
             var type = AccessTools.TypeByName("TheLastStand.Controller.Unit.Perk.PerkController");
             if (type == null) return "PerkController unavailable";
-            int slots = profile.Ranks != null && profile.Ranks.TryGetValue("legacy.perk", out int value) ? value : 0;
-            if (slots <= 0) return "no unlocked permanent perk slots";
+            // The user explicitly chose an unrestricted permanent protagonist.
+            // All vanilla perk definitions may be selected, not merely the usual three
+            // weapon-focused choices. Selection still requires user action.
+            int slots = selected.Count;
             var existing = GameBridge.Get(hero, "Perks") as IDictionary;
             int total = 0;
             var problems = new List<string>();
-            foreach (string id in selected.Distinct().Take(Math.Min(8, slots)))
+            foreach (string id in selected.Distinct())
             {
                 if (!db.Contains(id)) { problems.Add(id + ": definition missing"); continue; }
                 try
@@ -86,7 +113,7 @@ namespace EternalHero.Plugin
                     log.LogWarning("Eternal Hero permanent perk " + id + ": " + e.GetBaseException().Message);
                 }
             }
-            var summary = "perks active/already available=" + total + "/" + Math.Min(slots,selected.Count);
+            var summary = "perks active/already available=" + total + "/" + slots;
             if (problems.Count > 0) summary += "; errors=" + string.Join(" | ",problems.Take(5).ToArray());
             return summary;
         }

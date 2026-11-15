@@ -204,16 +204,27 @@ namespace EternalHero.Plugin
             int added = 0;
             foreach (var id in (profile.SelectedTraits ?? new List<string>()).Distinct().Take(max))
             {
-                if (!Traits().Any(x => x.Id == id &&
-                    !x.ForbiddenRaces.Contains(profile.HeroRaceId))) continue;
+                if (!Traits().Any(x => x.Id == id))
+                {
+                    log.LogWarning("Eternal Hero saved trait not found in game database: " + id);
+                    continue;
+                }
                 bool exists = false;
                 if (existing != null) foreach (object trait in existing)
                     if (Get(trait, "Id")?.ToString() == id) exists = true;
                 if (exists) { added++; continue; }
                 try
                 {
+                    // Explicitly selected permanent traits override randomized incompatibilities.
+                    // No repeated grants: the existing trait list is checked above.
                     var result = Call(Get(hero, "PlayableUnitController"), "AddTrait", id, false);
                     if (result is bool ok && ok) added++;
+                    else
+                    {
+                        result = Call(Get(hero, "PlayableUnitController"), "AddTrait", id, true);
+                        if (result is bool forced && forced) added++;
+                        else log.LogWarning("Eternal Hero could not add selected trait " + id);
+                    }
                 }
                 catch (Exception e) { log.LogWarning("Eternal Hero AddTrait(" + id + "): " + e.GetBaseException().Message); }
             }
@@ -240,6 +251,7 @@ namespace EternalHero.Plugin
                         Set(Get(view, "UnitHUD"), "name", heroName + " HUD");
                     }
                     Call(view, "RefreshBodyParts", true);
+                    Call(view, "DebugRefreshColorSwapping");
                 }
                 // GameView.TopScreenPanel.UnitPortraitsPanel.RefreshPortraits()
                 var top = StaticGet("TheLastStand.View.GameView", "TopScreenPanel");
@@ -271,12 +283,18 @@ namespace EternalHero.Plugin
 
         public static void CaptureEditorResult(object hero, HeroProfile profile)
         {
-            if (hero == null) return;
-            var value = Get(hero, "PortraitCodeData");
-            if (value != null) profile.PortraitCode = value.ToString();
+            if (hero == null || profile == null) return;
+            object codeData = Get(hero, "PortraitCodeData");
+            if (codeData != null)
+            {
+                string code = codeData.ToString();
+                if (!string.IsNullOrWhiteSpace(code))
+                    profile.PortraitCode = code.Trim();
+            }
             profile.HeroFaceId = Get(hero, "FaceId")?.ToString() ?? profile.HeroFaceId;
             profile.HeroGender = Get(hero, "Gender")?.ToString() ?? profile.HeroGender;
             profile.HeroName = Get(hero, "PlayableUnitName")?.ToString() ?? profile.HeroName;
+            profile.CreationConfirmed = true;
         }
     }
 }
