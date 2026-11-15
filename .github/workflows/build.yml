@@ -1,4 +1,4 @@
-name: Build Eternal Hero prototype
+name: Build Eternal Hero v0.5
 
 on:
   push:
@@ -14,7 +14,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Test progression engine
+      - name: Test progression and ascension engine
         run: dotnet run --project tests/EternalHero.Tests/EternalHero.Tests.csproj --configuration Release
       - name: Build BepInEx plugin
         run: dotnet build src/EternalHero.Plugin/EternalHero.Plugin.csproj --configuration Release
@@ -45,9 +45,9 @@ jobs:
           cp ModKit/Skills/*.patch.xml package/BepInEx/plugins/EternalHero/ModKit/Skills/
           cp ModKit/languages.csv package/BepInEx/plugins/EternalHero/ModKit/
           cd package
-          zip -r ../EternalHero-prototype.zip BepInEx INSTALL.md
+          zip -r ../EternalHero-v0.5.zip BepInEx INSTALL.md
       - uses: actions/upload-artifact@v4
         with:
-          name: EternalHero-prototype
+          name: EternalHero-v0.5
           path: EternalHero-prototype.zip
           if-no-files-found: error

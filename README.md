@@ -1,34 +1,30 @@
-# The Last Spell — Eternal Hero / Вечный защитник
+# Eternal Hero / Вечный защитник — The Last Spell
 
-[![CI](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml/badge.svg)](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
+[![Build](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml/badge.svg)](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
 
-## v0.4 — Native character creator and permanent-protagonist prototype
+**v0.5.0 — six-branch metaprogression**. The goal is a persistent protagonist who can eventually do the work of three ordinary heroes in one run.
 
-The progression UI has been **replaced** by a real Unity UGUI Canvas (not Unity IMGUI/OnGUI). BepInEx 5 only loads the plugin. Uses game sprites/icons when available and locally styled frames as fallback.
+## What's built
 
-### Current features
+- **96 upgrade nodes** across six branches: Стальное тело (16), Мастер оружия (16), Тактический гений (16), Наследие (16), Запретные техники (16), Триединство (16).
+- The rank 1–100 indicator is based on completion of all available upgrade ranks (not game XP level). Main-tree completion unlocks **Ascension**, with six repeatable increases after maxing every node.
+- A native Unity UGUI screen now offers category switching and displays only 16 upgrades per branch, their prerequisites, ranks and essence prices. Ascension has its own sixth tab.
+- **Six special skill definitions**, requiring [TLS.ModKit](https://github.com/stunl0ck/tls-modkit): Ghost Shot, Ether Slash, Arcane Pulse, Hunter Echo, Mage Echo, and Spectral Follow-up.
+- Hunter/Mage Echo and follow-up are defined as **0 AP / 0 mana, once-per-turn native skills**. They do NOT spawn separate monsters/characters or automatically fire; user selects the extra skill. Hero skill list is updated through the game's SkillController if available. Real gameplay needs confirmation.
+- Existing game traits and **permanent vanilla perks**, with selection slots unlocked through meta upgrades, saved to JSON and applied via native AddTrait and PerkController to the protagonist only.
+- Meta bonuses calculated across purchased ordinary + ascension ranks. Stat delta handling prevents reapplication of old stat bonuses after loading a game save.
+- Original v0.4 profile data is kept. Existing node IDs are unchanged; existing trait slots and XP carry over.
+- Existing night reward/event ledger and separate character-creator profile are retained.
 
-- Create a permanent protagonist profile: **name, unlocked race, gender, portrait code, and a loadout of existing game traits**.
-- Creator panel in **Russian**, native Unity buttons, text inputs, scrollable trait picker, original game race icons and game portrait preview.
-- **Native game appearance editor** for faces, artwork, hairstyles, colors, and portrait. It can be opened **after beginning a run**, when a real hero exists.
-- A **single free essence point** granted immediately to existing/new profiles for testing, once only.
-- Harmony patch on the **static** `PlayableUnitManager.CreateStartUnits` (previous versions incorrectly assumed an instance). First generated hero is customized and the selected existing traits are granted through the game's own `AddTrait`.
-- Race change uses the game's race definitions and race stat handlers.
-- Persistent upgrades are applied to game stats through the verified `IncreaseBaseStat` signature on newly generated heroes, with per-object delta protection.
-- Three **weapon-independent special skills** registered through [TLS.ModKit](https://github.com/stunl0ck/tls-modkit) and automatically granted via `SkillController` / `NativeSkills` if unlocked.
-- Stable run ID and automatic night meta-XP on `DistributeDailyExperience`, anti-duplication ledger per day; recognize hero when loading an existing save without stacking stats.
-- Save of character creation choices and purchased upgrades, including backups.
-
-### Limitations and test status
-
-CI **compiles** the plugin, checks persistence tests and validates skill XML syntax. We do **not yet claim** that all behavior works in-game on your build: portrait restoration, hero assignment, race changes, special skills, automatic night XP and stat changes need an actual game smoke test.
-
-Existing perks (other than selected game traits), richer illustrations and win/loss/boss automatic rewards are not yet connected; run reward engine already supports these events.
-
-**Install:** see [Russian instructions](docs/INSTALL.md). **Progress:** [roadmap](docs/ROADMAP.md).
+## Not yet finished
+Real-game QA is required to confirm skill XML parsing, native-perk activation, individual spell cooldowns/weapon-independent targeting, UI at different resolutions, safe portrait restoration and full 3-hero solo performance. Automatic boss/victory rewards, an actual one-hit resurrection mechanic (Последний бастион), and a dedicated teleport skill are **not implemented** yet. Echo attacks currently do not have separate spectral clones or custom VFX; they reuse available game effects.
 
 ## Download
+[GitHub Actions — successful builds](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml): open the newest green run and download **EternalHero-v0.5** under Artifacts. The artifact contains `EternalHero-v0.5.zip`, to extract into the game directory.
 
-[Latest successful GitHub Actions build](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml) → Artifacts → EternalHero-prototype.
+## Documents
+- [Installation and test checklist (RU)](docs/INSTALL.md)
+- [Progression mechanics (RU)](docs/META_PROGRESSION.md)
+- [Roadmap and known limitations (RU)](docs/ROADMAP.md)
 
-The repository does not include original game DLLs, copied artwork or fonts.
+Requires BepInEx 5 x64, The Last Spell, and TLS.ModKit for custom skill definitions. No game assets, DLLs or fonts are published in this repository.
