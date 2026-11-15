@@ -49,5 +49,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: EternalHero-v0.5
-          path: EternalHero-prototype.zip
+          path: EternalHero-v0.5.zip
           if-no-files-found: error
