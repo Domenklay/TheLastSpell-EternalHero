@@ -59,6 +59,111 @@ namespace EternalHero.Plugin
             if(ReferenceEquals(owner,Plugin.Instance.CurrentHero)) __result=true;
         }
 
+        internal static int AvailablePerkPoints(object hero)
+        {
+            try { return Convert.ToInt32(GameBridge.Get(hero, "PerksPoints") ?? 0); }
+            catch { return 0; }
+        }
+
+        internal static bool IsLearned(object hero, string id)
+        {
+            if (hero == null || string.IsNullOrWhiteSpace(id)) return false;
+            var dictionary = GameBridge.Get(hero, "Perks") as IDictionary;
+            if (dictionary == null || !dictionary.Contains(id)) return false;
+            return GameBridge.Get(dictionary[id], "Unlocked") is bool value && value;
+        }
+
+        // This works with the game's original PerkController, but does not add new columns
+        // to the vanilla six-column view. It purchases any *existing* PerkDefinition
+        // for one ordinary perk point and saves it as a dynamic perk in the game's save.
+        internal static bool PurchaseAnyPerk(object hero, string id, ManualLogSource log,
+            out string error)
+        {
+            error = null;
+            if (hero == null || Plugin.Instance == null ||
+                !ReferenceEquals(hero, Plugin.Instance.CurrentHero))
+            {
+                error = "Главный герой не найден в текущем забеге";
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(id)) { error = "Перк не выбран"; return false; }
+            var db = GameBridge.StaticGet(Database, "PerkDefinitions") as IDictionary;
+            if (db == null || !db.Contains(id))
+            { error = "Перка нет в базе данных игры"; return false; }
+            int points = AvailablePerkPoints(hero);
+            if (points <= 0) { error = "Недостаточно очков особых черт"; return false; }
+            var perks = GameBridge.Get(hero, "Perks") as IDictionary;
+            if (perks == null) { error = "Не обнаружен игровой список перков"; return false; }
+            if (IsLearned(hero, id)) { error = "Перк уже изучен"; return false; }
+
+            try
+            {
+                object controller;
+                if (perks.Contains(id))
+                {
+                    controller = GameBridge.Get(perks[id], "PerkController");
+                    if (controller == null) { error = "Нет контроллера существующего перка"; return false; }
+                }
+                else
+                {
+                    var type = AccessTools.TypeByName("TheLastStand.Controller.Unit.Perk.PerkController");
+                    object definition = db[id];
+                    var constructor = type?.GetConstructors().FirstOrDefault(c =>
+                    {
+                        var parameters = c.GetParameters();
+                        return parameters.Length == 7 &&
+                            parameters[0].ParameterType.IsInstanceOfType(definition) &&
+                            parameters[2].ParameterType.IsInstanceOfType(hero) &&
+                            parameters[4].ParameterType == typeof(string) &&
+                            parameters[5].ParameterType == typeof(bool) &&
+                            parameters[6].ParameterType == typeof(bool);
+                    });
+                    if (constructor == null)
+                    { error = "Неподдерживаемая версия игрового PerkController"; return false; }
+                    // isNative = false and isFromRace = false: the perk is serialized by
+                    // PlayableUnit.Serialize() as a dynamic perk, not as an original tier.
+                    controller = constructor.Invoke(new object[] {
+                        definition, null, hero, null, string.Empty, false, false
+                    });
+                    if (GameBridge.Get(controller, "Perk") == null)
+                    { error = "Игра не создала перк"; return false; }
+                }
+
+                var method = controller.GetType().GetMethods().FirstOrDefault(m => {
+                    var args = m.GetParameters();
+                    return m.Name == "Unlock" && args.Length == 1 &&
+                        args[0].ParameterType.IsInstanceOfType(hero);
+                });
+                if (method == null) { error = "Метод разблокировки недоступен"; return false; }
+                method.Invoke(controller, new[] { hero });
+
+                // Charge the point only after the game's own controller has confirmed
+                // the perk is unlocked, so failed attempts do not spend currency.
+                if (!IsLearned(hero, id))
+                { error = "Игра отказалась активировать перк"; return false; }
+                if (!GameBridge.Set(hero, "PerksPoints", points - 1))
+                {
+                    // Fail closed when point storage changed: reverse the unlock we made.
+                    var lockWithoutArgs=controller.GetType().GetMethods().FirstOrDefault(m =>
+                        m.Name == "LockAndClearUnlockers" && m.GetParameters().Length == 1);
+                    try { lockWithoutArgs?.Invoke(controller, new object[] { true }); }
+                    catch { }
+                    error = "Не удалось списать очко — покупка отменена";
+                    return false;
+                }
+                log.LogInfo("Eternal Hero: purchased off-tree perk " + id +
+                    " for 1 original perk point; remaining " + (points - 1));
+                GameBridge.RefreshHeroPresentation(hero, log);
+                return true;
+            }
+            catch (Exception e)
+            {
+                error = "Ошибка игрового API: " + e.GetBaseException().Message;
+                log.LogWarning("Eternal Hero off-tree perk " + id + ": " + e);
+                return false;
+            }
+        }
+
         // Uses the same PerkController/native-perk path as the game's existing Glyph perks.
         // Never unlocks the perks of companions.
         internal static bool UnlockAllTiers(object hero, HeroProfile profile, ManualLogSource log)
