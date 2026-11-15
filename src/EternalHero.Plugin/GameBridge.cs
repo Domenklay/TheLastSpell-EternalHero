@@ -281,7 +281,10 @@ namespace EternalHero.Plugin
                     Call(sheet, "RefreshAvatar", hero);
                     Call(sheet, "RefreshName", hero);
                     Call(sheet, "RefreshPortrait", hero);
+                    Call(sheet, "RefreshOpenedPage");
                 }
+                var detailsView = StaticGet("TheLastStand.View.GameView", "CharacterDetailsView");
+                if (detailsView != null) Set(detailsView, "IsDirty", true);
             }
             catch (Exception e) { log.LogWarning("Eternal Hero HUD refresh: " + e.GetBaseException().Message); }
         }
