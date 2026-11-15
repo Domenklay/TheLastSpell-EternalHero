@@ -31,6 +31,7 @@ namespace EternalHero.Plugin
         private int mainBranchChoice;
         private int specialBranchChoice;
         private bool choosePerks;
+        private bool perkRunMode;
         private int traitPage;
         private int traitFilter;
         private string traitSearch = "";
@@ -396,17 +397,26 @@ namespace EternalHero.Plugin
                 "Выбранные способности сохраняются. Обычная карточка показывает лишь первые черты.");
             Action(rightPane, "TraitSub", 30,110,458,43,
                 "ЧЕРТЫ  •  "+(p.SelectedTraits?.Count??0)+"/"+traitSlots,()=>{
-                    choosePerks=false;traitPage=0;traitFilter=0;traitSearch="";Rebuild();
+                    choosePerks=false;perkRunMode=false;traitPage=0;traitFilter=0;traitSearch="";Rebuild();
                 },!choosePerks);
             Action(rightPane, "PerkSub", 495,110,458,43,
                 "ПЕРКИ  •  "+(p.SelectedPerks?.Count??0)+" / ВСЕ",()=>{
-                    choosePerks=true;traitPage=0;traitFilter=0;traitSearch="";Rebuild();
+                    choosePerks=true;perkRunMode=false;traitPage=0;traitFilter=0;traitSearch="";Rebuild();
                 },choosePerks);
             int max = choosePerks ? int.MaxValue : traitSlots;
-            Label(rightPane,choosePerks
-                ? "ВСЕ ПЕРКИ  •  все 5 уровней дерева разблокированы для ГГ"
-                : "ДОПОЛНИТЕЛЬНЫХ ЧЕРТ: "+(p.SelectedTraits?.Count??0)+"/"+traitSlots+
-                  "  •  до 12 + обычные стартовые",
+            if(choosePerks)
+            {
+                Action(rightPane,"PermanentPerks",32,162,443,31,"ПОСТОЯННЫЕ",()=>{
+                    perkRunMode=false;traitPage=0;traitFilter=0;Rebuild();
+                },!perkRunMode);
+                Action(rightPane,"RunPerks",486,162,465,31,
+                    "ЗАБЕГ  •  ОЧКОВ "+GamePerks.AvailablePerkPoints(mod.CurrentHero),()=>{
+                    perkRunMode=true;traitPage=0;traitFilter=0;Rebuild();
+                },perkRunMode);
+            }
+            else Label(rightPane,
+                "ДОПОЛНИТЕЛЬНЫХ ЧЕРТ: "+(p.SelectedTraits?.Count??0)+"/"+traitSlots+
+                "  •  до 12 + обычные стартовые",
                 32,162,920,32,17,gold,TextAnchor.MiddleLeft,true);
             Field(rightPane,32,197,922,42,traitSearch,"Найти по названию или эффекту...",v=>{
                 traitSearch=(v??"").Trim();traitPage=0;Rebuild();
@@ -426,6 +436,10 @@ namespace EternalHero.Plugin
                       HasDrawbacks=x.HasDrawbacks
                   }).ToArray();
             var chosenIds=choosePerks?p.SelectedPerks:p.SelectedTraits;
+            bool runMode=choosePerks && perkRunMode;
+            Func<string,bool> selectedById = id => runMode
+                ? GamePerks.IsLearned(mod.CurrentHero,id)
+                : chosenIds!=null && chosenIds.Contains(id);
             string filterText=traitSearch.Trim();
             IEnumerable<TraitEntry> filtered=entries;
             if(!string.IsNullOrWhiteSpace(filterText))
@@ -437,15 +451,15 @@ namespace EternalHero.Plugin
             {
                 if(traitFilter==1) filtered=filtered.Where(x=>!x.HasDrawbacks);
                 else if(traitFilter==2) filtered=filtered.Where(x=>x.HasDrawbacks);
-                else if(traitFilter==3) filtered=filtered.Where(x=>chosenIds!=null&&chosenIds.Contains(x.Id));
+                else if(traitFilter==3) filtered=filtered.Where(x=>selectedById(x.Id));
             }
             else if(traitFilter>0)
-                filtered=filtered.Where(x=>chosenIds!=null&&chosenIds.Contains(x.Id));
+                filtered=filtered.Where(x=>selectedById(x.Id));
             var eligible=filtered.OrderByDescending(x=>chosenIds!=null&&chosenIds.Contains(x.Id))
                 .ThenBy(x=>x.Name).ToArray();
 
             string[] filters=choosePerks?
-                new[]{"ВСЕ ПЕРКИ","ВЫБРАННЫЕ"}:
+                new[]{"ВСЕ ПЕРКИ",runMode?"ИЗУЧЕННЫЕ":"ВЫБРАННЫЕ"}:
                 new[]{"ВСЕ","БЕЗ ШТРАФОВ","СО ШТРАФАМИ","ВЫБРАННЫЕ"};
             float fw=(923f-(filters.Length-1)*6f)/filters.Length;
             for(int i=0;i<filters.Length;i++)
@@ -468,9 +482,17 @@ namespace EternalHero.Plugin
                 var entry=visible[i];
                 int col=i%columns,row=i/columns;
                 float x=margin+col*(cw+gap),y=7+row*58;
-                bool chosen=chosenIds!=null&&chosenIds.Contains(entry.Id);
+                bool chosen=selectedById(entry.Id);
                 var selectedEntry=entry;
                 var tile=Action(list,"Pick-"+entry.Id,x,y,cw,53,"",()=>{
+                    if(runMode)
+                    {
+                        if(GamePerks.PurchaseAnyPerk(mod.CurrentHero,selectedEntry.Id,log,
+                            out string error))
+                            Notify("Изучен перк за 1 очко: "+selectedEntry.Name);
+                        else Notify("Не удалось изучить: "+error);
+                        return;
+                    }
                     var selected=choosePerks?p.SelectedPerks:p.SelectedTraits;
                     if(selected==null)
                     {
@@ -492,10 +514,16 @@ namespace EternalHero.Plugin
                     mod.ApplyCurrentHero();
                     Rebuild();
                 },chosen);
-                tile.interactable=chosen || (!entry.Restricted && max>0);
+                tile.interactable=runMode
+                    ? !chosen && mod.CurrentHero!=null &&
+                        GamePerks.AvailablePerkPoints(mod.CurrentHero)>0
+                    : chosen || (!entry.Restricted && max>0);
                 Label(tile.transform,(chosen?"✓ ":"")+entry.Name,7,2,cw-14,24,16,
                     chosen?gold:parchment,TextAnchor.MiddleLeft,true);
-                string preview=entry.Restricted?"Недоступна расе":entry.Description??"";
+                string preview=runMode
+                    ? (chosen?"ИЗУЧЕНО":GamePerks.AvailablePerkPoints(mod.CurrentHero)>0
+                        ?"ИЗУЧИТЬ ЗА 1 ОЧКО":"НЕТ ОЧКОВ ПЕРКОВ")
+                    : entry.Restricted?"Недоступна расе":entry.Description??"";
                 if(preview.Length>36)preview=preview.Substring(0,33)+"...";
                 Label(tile.transform,preview,7,29,cw-14,19,12,muted,TextAnchor.MiddleLeft);
             }
@@ -511,9 +539,11 @@ namespace EternalHero.Plugin
             Action(rightPane,"Next",772,579,177,41,"ДАЛЬШЕ ▶",()=>{
                 traitPage=Math.Min(pages-1,traitPage+1);Rebuild();
             }).interactable=traitPage+1<pages;
-            Label(rightPane,choosePerks
-                ? "Выбранные перки сохраняются отдельно; в оригинальном дереве доступность рангов не расходует очки."
-                : "Черт можно купить больше трёх: обычная панель игры показывает только несколько первых.",
+            Label(rightPane,runMode
+                ? "Изучение расходует 1 обычное очко особых черт. Перк действует в текущем забеге и сохраняется игрой."
+                : choosePerks
+                    ? "Постоянные перки сохраняются в профиле и возвращаются ГГ при новом забеге."
+                    : "Черт можно выбрать больше трёх: оригинальная карточка отображает только несколько первых.",
                 30,631,914,51,16,muted,TextAnchor.UpperLeft);
         }
 
