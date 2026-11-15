@@ -14,7 +14,7 @@ namespace EternalHero.Plugin
     public sealed class Plugin : BaseUnityPlugin
     {
         internal const string Id = "domenklay.tls.eternalhero";
-        internal const string Version = "0.7.0";
+        internal const string Version = "0.8.0";
 
         private Harmony harmony;
         private ProfileStore store;
@@ -25,6 +25,7 @@ namespace EternalHero.Plugin
         private ConfigEntry<bool> debugRewards;
         private ConfigEntry<bool> openOnStartup;
         private ConfigEntry<float> editorScale;
+        private ConfigEntry<bool> removeRacePenalties;
         private object currentHero;
         private string rosterStatus = "Герой не обнаружен; начни новый забег";
         private float nextRosterProbeTime;
@@ -37,6 +38,7 @@ namespace EternalHero.Plugin
         internal string RosterStatus => rosterStatus;
         internal bool EnableDebugRewards => debugRewards != null && debugRewards.Value;
         internal float MenuScale => Mathf.Clamp(editorScale?.Value ?? .78f, .58f, 1f);
+        internal bool IgnoreRacialPenalties => removeRacePenalties == null || removeRacePenalties.Value;
 
         private void Awake()
         {
@@ -49,6 +51,8 @@ namespace EternalHero.Plugin
                     "Automatically apply purchased stat upgrades to the protagonist on a NEW run.");
                 openOnStartup = Config.Bind("Interface", "OpenCreatorOnStartupV06", false,
                     "Open the native Unity character creator on game startup.");
+                removeRacePenalties = Config.Bind("Eternal Hero", "RemoveNegativeRaceEffects", true,
+                    "Keep positive race bonuses, suppress negative racial stat and racial-perk effects on the Eternal Hero only.");
                 editorScale = Config.Bind("Interface", "MenuScale", .78f,
                     "Scale of the character creator window. Allowed range: 0.58 to 1.00.");
                 store = new ProfileStore(Path.Combine(Paths.ConfigPath, "EternalHero", "profile.json"));
@@ -68,6 +72,7 @@ namespace EternalHero.Plugin
                 }
 
                 harmony = new Harmony(Id);
+                RacialPenaltyGuard.Install(harmony, Logger);
                 var start = AccessTools.Method("TheLastStand.Manager.Unit.PlayableUnitManager:CreateStartUnits");
                 if (start != null)
                 {
