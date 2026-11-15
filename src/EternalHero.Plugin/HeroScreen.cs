@@ -679,6 +679,7 @@ namespace EternalHero.Plugin
                 "\nЗабегов: "+p.RunsStarted+"   Побед: "+p.Victories+
                 "\nПережито ночей: "+p.TotalNightsSurvived+
                 "\nВыбранных черт: "+(p.SelectedTraits?.Count??0)+
+                "\nРасовые штрафы: "+(mod.IgnoreRacialPenalties?"отключены для ГГ":"включены")+
                 "\nОбнаружение героя: "+(mod.CurrentHero==null?"нет":"да")+
                 "\nТекущая сессия: "+mod.RosterStatus;
             Label(rightPane,t,34,119,925,313,19,parchment,TextAnchor.UpperLeft);
