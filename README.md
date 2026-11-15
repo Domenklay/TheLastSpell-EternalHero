@@ -1,22 +1,23 @@
-# Eternal Hero — Вечный защитник (The Last Spell)
+# The Last Spell — Eternal Hero / Вечный защитник
 
 [![Build](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml/badge.svg)](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
 
-## v0.7 — persistent protagonist, selected traits and career statistics
+## v0.8.0 — racial debuffs, expanded traits and 4-column UI
 
-Changes over v0.6:
+Changes since v0.7:
 
-- **Portrait persistence:** the native game's appearance-editor confirmation now captures the *first playable unit* even when the previous CreateStartUnits callback was missed. The saved portrait code's presence is displayed in the creator, and a redundant click on the already selected gender no longer deletes the stored code. Portrait restoration uses CodeGenerator + PortraitAPIManager and refreshes body parts, color palette, snapshot, original game unit portraits and character panel.
-- **Permanent traits:** selected traits are added using AddTrait, including the explicitly chosen override when default randomly generated traits conflict. Selected traits are brought to the front of the native character's list because the native character sheet shows only its normal number of icons.
-- **All perk specializations:** the protagonist can select any existing perk from the game's catalogue without the former 8-perk cap and without restrictions to the initially generated weapon specializations. The mod also attempts to unlock all five native perk tiers for this hero, without changing any other character. Standard perk points are still needed for purchases directly in the original game UI; the mod's specifically selected persistent perks are granted through the existing PerkController.
-- **Career/personal achievements:** existing game's `PlayableUnit.LifetimeStats` counters and weapon/enemy dictionaries are captured into a separate persistent profile and restored to each NEW starting hero. Capturing the highest cumulative values prevents repeated save reloads from duplicating totals. The vanilla `Личные достижения` section should now show carried totals on subsequent runs.
-- **Existing v0.6 meta progression and 96 upgrade nodes** remain unchanged. Automatic career checkpoints every 15 seconds, on quit, after nights, and before switching heroes.
+- **12 selectable permanent traits (plus randomly generated vanilla traits)**: the "Закалённый ветеран" node now has 11 ranks, each unlocking one additional selection. This preserves the same upgrade ID in older profiles. Original game's character sheet has a limited number of visible trait icons. All trait definitions reside on the hero regardless of how many it displays.
+- **Compact 4-column trait/perk grid**: 20 entries per page, thinner rows, search by name/ID/effect and 4 filters — All, Without Penalties, With Penalties, Selected. Filters use actual trait stat and slot modifiers.
+- **Negative race modifiers are neutralized only for Eternal Hero**: native racial stats with a negative Race component are compensated on reading the final stat. Negative `StatModifierEffect.Value` and `DynamicStatsModifierEffect.Value` belonging to racial perks are masked; **positive racial bonuses remain**. This includes conditional penalties like the red damage penalty in racial-perk descriptions. Original tooltips may still display the original negative text, because localization is not altered.
+- **All five vanilla perk tiers accessible** to the protagonist irrespective of preceding perk purchases through a Harmony override of the native tier availability getter. The game's random selection of six perk columns is unchanged; permanent perks from other columns can be selected in the mod's perk catalogue. Vanilla perk-point costs for native tree purchases remain unchanged.
+- All changes affect **the protagonist only**. Other party members keep their vanilla races, perks and traits. The UI shows whether racial penalty suppression is enabled.
+- Metaprogression, permanent stats and achievements, save profile, portrait/race/trait persistence are retained.
 
-These fixes require testing in the installed game. GitHub CI validates compilation, independent core save/reload, progression tests and XML syntax only. A game update or third-party mod can change the integration behavior.
+**Status:** code compiles in GitHub Actions and persistence tests pass. Actual game runtime behavior, especially the damage suppression inside conditional racial perks, still requires a new-run smoke test.
 
 ## Downloads
-[GitHub Actions Builds](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml) → latest successful run → artifact EternalHero-v0.7.
+[GitHub Actions](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml) → latest **green** run → artifact **EternalHero-v0.8**.
 
-[Russian installation instructions](docs/INSTALL.md) · [Progression](docs/META_PROGRESSION.md)
+[Installation and verification](docs/INSTALL.md) · [Progression](docs/META_PROGRESSION.md) · [Roadmap](docs/ROADMAP.md)
 
-No copyrighted game assets are shipped with the mod.
+This repository distributes no copyrighted game textures, original game binaries or fonts.
