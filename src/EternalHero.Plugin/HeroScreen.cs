@@ -426,7 +426,8 @@ namespace EternalHero.Plugin
             var perks = choosePerks?GamePerks.Available():null;
             var entries = choosePerks
                 ? perks.Select(x=>new TraitEntry {
-                      Id=x.Id,Name=x.Name,Description=x.Id
+                      Id=x.Id,Name=x.Name,Description=x.Id,
+                      Category=x.Collection,Tier=x.Tier
                   }).ToArray()
                 : traits.Select(x=>new TraitEntry {
                       Id=x.Id,Name=x.Name,
@@ -446,7 +447,8 @@ namespace EternalHero.Plugin
                 filtered=filtered.Where(x=>
                     x.Name.IndexOf(filterText,StringComparison.OrdinalIgnoreCase)>=0 ||
                     x.Id.IndexOf(filterText,StringComparison.OrdinalIgnoreCase)>=0 ||
-                    (x.Description??"").IndexOf(filterText,StringComparison.OrdinalIgnoreCase)>=0);
+                    (x.Description??"").IndexOf(filterText,StringComparison.OrdinalIgnoreCase)>=0 ||
+                    (x.Category??"").IndexOf(filterText,StringComparison.OrdinalIgnoreCase)>=0);
             if(!choosePerks)
             {
                 if(traitFilter==1) filtered=filtered.Where(x=>!x.HasDrawbacks);
@@ -455,7 +457,9 @@ namespace EternalHero.Plugin
             }
             else if(traitFilter>0)
                 filtered=filtered.Where(x=>selectedById(x.Id));
-            var eligible=filtered.OrderByDescending(x=>chosenIds!=null&&chosenIds.Contains(x.Id))
+            var eligible=filtered.OrderByDescending(x=>selectedById(x.Id))
+                .ThenBy(x=>choosePerks?x.Category:x.Name)
+                .ThenBy(x=>choosePerks?x.Tier:0)
                 .ThenBy(x=>x.Name).ToArray();
 
             string[] filters=choosePerks?
@@ -520,10 +524,13 @@ namespace EternalHero.Plugin
                     : chosen || (!entry.Restricted && max>0);
                 Label(tile.transform,(chosen?"✓ ":"")+entry.Name,7,2,cw-14,24,16,
                     chosen?gold:parchment,TextAnchor.MiddleLeft,true);
+                string category = string.IsNullOrEmpty(entry.Category)?"Общие":entry.Category;
                 string preview=runMode
-                    ? (chosen?"ИЗУЧЕНО":GamePerks.AvailablePerkPoints(mod.CurrentHero)>0
-                        ?"ИЗУЧИТЬ ЗА 1 ОЧКО":"НЕТ ОЧКОВ ПЕРКОВ")
-                    : entry.Restricted?"Недоступна расе":entry.Description??"";
+                    ? category+" • "+(chosen?"ИЗУЧЕНО":GamePerks.AvailablePerkPoints(mod.CurrentHero)>0
+                        ?"1 ОЧКО":"НЕТ ОЧКОВ")
+                    : choosePerks
+                        ? category+" • УР. "+entry.Tier
+                        : entry.Restricted?"Недоступна расе":entry.Description??"";
                 if(preview.Length>36)preview=preview.Substring(0,33)+"...";
                 Label(tile.transform,preview,7,29,cw-14,19,12,muted,TextAnchor.MiddleLeft);
             }
@@ -554,6 +561,8 @@ namespace EternalHero.Plugin
             public string Description;
             public bool Restricted;
             public bool HasDrawbacks;
+            public string Category;
+            public int Tier;
         }
 
         private void DrawProgression(HeroProfile p, bool special)
