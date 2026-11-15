@@ -638,10 +638,10 @@ namespace EternalHero.Plugin
                 "\nОбнаружение героя: "+(mod.CurrentHero==null?"нет":"да")+
                 "\nТекущая сессия: "+mod.RosterStatus;
             Label(rightPane,t,34,119,925,313,19,parchment,TextAnchor.UpperLeft);
-            Label(rightPane,GameCareerHistory.Summary(p),
-                34,385,921,69,15,gold,TextAnchor.UpperLeft);
             Image(rightPane,"Divider",29,441,926,2,gold);
-            Label(rightPane,status,36,458,910,66,18,gold,TextAnchor.UpperLeft);
+            Label(rightPane,status,36,454,910,49,17,gold,TextAnchor.UpperLeft);
+            Label(rightPane,GameCareerHistory.Summary(p),
+                34,509,921,38,15,parchment,TextAnchor.UpperLeft);
             if(mod.EnableDebugRewards)
             {
                 Action(rightPane,"GrantXP",38,552,421,56,"DEV: +100 ОПЫТА",()=>{
