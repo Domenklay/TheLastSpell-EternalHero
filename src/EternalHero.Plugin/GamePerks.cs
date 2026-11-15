@@ -15,6 +15,8 @@ namespace EternalHero.Plugin
         {
             public string Id;
             public string Name;
+            public string Collection = "Общие";
+            public int Tier;
         }
 
         internal static List<Option> Available()
@@ -22,13 +24,44 @@ namespace EternalHero.Plugin
             var list = new List<Option>();
             var defs = GameBridge.StaticGet(Database, "PerkDefinitions") as IDictionary;
             if (defs == null) return list;
+            var byId = new Dictionary<string, Option>();
             foreach (DictionaryEntry entry in defs)
             {
                 if (!(entry.Key is string id)) continue;
                 string name = GameBridge.Get(entry.Value, "Name")?.ToString();
-                list.Add(new Option { Id = id, Name = string.IsNullOrWhiteSpace(name) ? id : name });
+                var option = new Option { Id = id, Name = string.IsNullOrWhiteSpace(name) ? id : name };
+                list.Add(option);
+                byId[id] = option;
             }
-            return list.OrderBy(x => x.Name).ToList();
+            // Every vanilla perk can belong to one or more collections. Display the
+            // first matching specialization and its actual tier, for search and clarity.
+            var collections = GameBridge.StaticGet(Database, "UnitPerkCollectionDefinitions") as IDictionary;
+            if (collections != null)
+            {
+                foreach (DictionaryEntry col in collections)
+                {
+                    string category = col.Key?.ToString() ?? "Общие";
+                    var tiers = GameBridge.Get(col.Value, "PerksFromTier") as IDictionary;
+                    if (tiers == null) continue;
+                    foreach (DictionaryEntry tier in tiers)
+                    {
+                        int level = 0;
+                        try { level = Convert.ToInt32(tier.Key); } catch { }
+                        if (!(tier.Value is IEnumerable options)) continue;
+                        foreach (object pair in options)
+                        {
+                            string id = GameBridge.Get(GameBridge.Get(pair, "Item1"), "Id")?.ToString();
+                            if (id == null || !byId.TryGetValue(id, out Option option)) continue;
+                            if (option.Tier == 0)
+                            {
+                                option.Collection = category;
+                                option.Tier = level;
+                            }
+                        }
+                    }
+                }
+            }
+            return list.OrderBy(x => x.Collection).ThenBy(x => x.Tier).ThenBy(x => x.Name).ToList();
         }
 
         internal static void Install(Harmony harmony, ManualLogSource log)
