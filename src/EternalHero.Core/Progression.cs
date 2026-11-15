@@ -199,6 +199,12 @@ namespace EternalHero.Core
             if (profile.Appearance == null) profile.Appearance = new Dictionary<string, string>();
         }
 
+        public int TotalUpgradeRanks => UpgradeCatalog.All.Sum(x => x.MaxRank);
+        public int PurchasedUpgradeRanks => UpgradeCatalog.All.Sum(x => Math.Min(x.MaxRank, Rank(x.Id)));
+        public bool MainTreeCompleted => PurchasedUpgradeRanks == TotalUpgradeRanks;
+        public int MetaRank => 1 + (int)(99L * PurchasedUpgradeRanks / TotalUpgradeRanks);
+        public float Completion => TotalUpgradeRanks == 0 ? 0 : (float)PurchasedUpgradeRanks / TotalUpgradeRanks;
+
         public int Rank(string upgradeId) =>
             Profile.Ranks.TryGetValue(upgradeId, out var rank) ? rank : 0;
 
@@ -256,7 +262,28 @@ namespace EternalHero.Core
                 if (amount <= 0f) continue;
                 result[u.StatId] = (result.TryGetValue(u.StatId, out var old) ? old : 0) + amount;
             }
+            foreach (var a in AscensionCatalog.All)
+            {
+                if (!Profile.AscensionRanks.TryGetValue(a.Id, out int rank) || rank <= 0) continue;
+                float amount = rank * a.BonusPerRank;
+                result[a.StatId] = (result.TryGetValue(a.StatId, out float previous) ? previous : 0) + amount;
+            }
             return result;
+        }
+
+        public bool PurchaseAscension(string id, out string reason)
+        {
+            var upgrade = AscensionCatalog.All.FirstOrDefault(a => a.Id == id);
+            if (upgrade == null) { reason = "Unknown ascension"; return false; }
+            if (!MainTreeCompleted) { reason = "Complete all six branches first"; return false; }
+            Profile.AscensionRanks.TryGetValue(id, out int rank);
+            if (rank >= 100000) { reason = "Ascension safety limit"; return false; }
+            int cost = checked(5 + 2 * rank);
+            if (Profile.AvailableEssence < cost) { reason = "Not enough essence"; return false; }
+            Profile.AvailableEssence -= cost;
+            Profile.AscensionRanks[id] = rank + 1;
+            reason = null;
+            return true;
         }
     }
 }

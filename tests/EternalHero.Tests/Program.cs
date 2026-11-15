@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using EternalHero.Core;
 
 internal static class Program
@@ -80,6 +81,38 @@ internal static class Program
             Check(recovered.Profile.StarterEssenceGranted, "free starter essence flag persists");
             Check(recovered.Profile.SelectedTraits.Contains("Test-Existing-Trait"), "trait loadout survives reload");
 
+            Check(UpgradeCatalog.All.Count == 96, "all 96 upgrades registered");
+            Check(UpgradeCatalog.Branches.Count == 6, "six specialization branches");
+            Check(UpgradeCatalog.All.Select(u => u.Id).Distinct().Count() == 96, "upgrade IDs unique");
+            Check(UpgradeCatalog.All.All(u => u.RequiresId == null ||
+                UpgradeCatalog.Find(u.RequiresId) != null), "all prerequisites refer to valid nodes");
+            Check(recovered.MetaRank == 1, "fresh meta rank determined from ranks");
+            Check(!recovered.PurchaseAscension("asc.health", out _),
+                "ascension locked until full main-tree completion");
+            recovered.Profile.AvailableEssence = 1000000; // test-only budget, not written to user's profile
+            bool changed;
+            int passes = 0;
+            do {
+                changed = false;
+                foreach (var node in UpgradeCatalog.All)
+                    if (recovered.Purchase(node.Id, out _)) changed = true;
+                passes++;
+                if (passes > 100) throw new Exception("Upgrade prerequisite cycle");
+            } while (changed);
+            Check(recovered.MainTreeCompleted, "entire six-branch tree is achievable");
+            Check(recovered.PurchasedUpgradeRanks == recovered.TotalUpgradeRanks,
+                "every node reaches maximum rank");
+            Check(recovered.MetaRank == 100, "completed tree reports legendary rank 100");
+            Check(recovered.PurchaseAscension("asc.health", out _),
+                "ascension opens after fully completing development");
+            Check(recovered.Profile.AscensionRanks["asc.health"] == 1, "ascension records permanent rank");
+            Check(recovered.CalculatedStatBonuses()["Health"] >= 15f,
+                "ascension contributes real health bonus");
+            store.Save(recovered.Profile);
+            var reloaded = new ProgressionService(store.Load());
+            Check(reloaded.MainTreeCompleted, "completion survives save reload");
+            Check(reloaded.Profile.AscensionRanks["asc.health"] == 1,
+                "ascension survives save reload");
             Console.WriteLine("ALL PROGRESSION TESTS PASSED");
         }
         finally
