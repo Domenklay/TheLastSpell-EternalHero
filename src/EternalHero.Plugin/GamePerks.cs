@@ -31,6 +31,34 @@ namespace EternalHero.Plugin
             return list.OrderBy(x => x.Name).ToList();
         }
 
+        internal static void Install(Harmony harmony, ManualLogSource log)
+        {
+            try
+            {
+                // The original game only sets UnitPerkTier.Available after previous
+                // tier purchases. For this one hero, expose every tier as accessible.
+                var type=AccessTools.TypeByName("TheLastStand.Model.Unit.Perk.UnitPerkTier");
+                var getter=type?.GetProperty("Available")?.GetGetMethod();
+                var postfix=AccessTools.Method(typeof(GamePerks),nameof(AvailableForProtagonist));
+                if(getter!=null && postfix!=null)
+                {
+                    harmony.Patch(getter,postfix:new HarmonyMethod(postfix));
+                    log.LogInfo("Eternal Hero: all vanilla perk tiers accessible to protagonist");
+                }
+                else log.LogWarning("Eternal Hero: UnitPerkTier.Available getter not found");
+            }
+            catch(Exception ex){ log.LogWarning("Eternal Hero perk tier Harmony patch: "+ex); }
+        }
+
+        private static void AvailableForProtagonist(object __instance, ref bool __result)
+        {
+            if (__result || Plugin.Instance?.CurrentHero == null ||
+                Plugin.Instance.Profile?.UnlockAllPerkTiers != true) return;
+            var tree=GameBridge.Get(__instance,"UnitPerkTree");
+            var owner=GameBridge.Get(tree,"PlayableUnit");
+            if(ReferenceEquals(owner,Plugin.Instance.CurrentHero)) __result=true;
+        }
+
         // Uses the same PerkController/native-perk path as the game's existing Glyph perks.
         // Never unlocks the perks of companions.
         internal static bool UnlockAllTiers(object hero, HeroProfile profile, ManualLogSource log)
