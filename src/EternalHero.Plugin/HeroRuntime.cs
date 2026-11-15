@@ -160,7 +160,7 @@ namespace EternalHero.Plugin
         {
             if (hero == null || previous == null) return;
             if (Patched.TryGetValue(hero, out _)) return;
-            Patched.Add(hero, new Dictionary<string, float>(previous));
+            Patched.Add(hero, previous.ToDictionary(pair => pair.Key, pair => pair.Value));
         }
 
         // Conservative bridge. Refuses unknown stat API signatures and changes only named stats.
