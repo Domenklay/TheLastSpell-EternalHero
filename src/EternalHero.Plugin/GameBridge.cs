@@ -99,6 +99,7 @@ namespace EternalHero.Plugin
             public string Name;
             public int Cost;
             public bool HasDrawbacks;
+            public List<string> StatIds = new List<string>();
             public string Description = "";
             public List<string> ForbiddenRaces = new List<string>();
         }
@@ -138,6 +139,7 @@ namespace EternalHero.Plugin
                     foreach (object modifier in modifiers)
                     {
                         var stat = Get(modifier, "Stat")?.ToString();
+                        if (!string.IsNullOrWhiteSpace(stat)) trait.StatIds.Add(stat);
                         var value = Get(modifier, "Value");
                         if (stat != null && value != null)
                         {

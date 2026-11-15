@@ -142,6 +142,22 @@ internal static class Program
                 "weapon history survives profile serialization");
             Check(longTerm.UnlockAllPerkTiers && longTerm.SelectedPerks.Contains("SamplePerk"),
                 "unrestricted perk choices survive serialization");
+            Check(TraitBrowser.CategoriesFor(new[] { "PhysicalDamage" }).Contains("УРОН"),
+                "physical attack traits belong to damage category");
+            Check(TraitBrowser.CategoriesFor(new[] { "HealthTotal", "ArmorTotal" })
+                .Contains("ЗДОРОВЬЕ") && TraitBrowser.CategoriesFor(new[] { "HealthTotal", "ArmorTotal" })
+                .Contains("ЗАЩИТА"), "mixed traits appear in multiple relevant categories");
+            Check(TraitBrowser.CategoriesFor(new[] { "ManaRegen" }).Contains("МАНА"),
+                "mana regeneration traits categorized correctly");
+            Check(TraitBrowser.CategoriesFor(new string[0]).Contains("ОСОБЫЕ"),
+                "traits without numeric modifiers remain discoverable");
+            Check(TraitBrowser.MatchesSearch("Ядовитая кожа", "Trait.Poison",
+                "PoisonDamage 20", "УРОН", "яд кожа"), "multiword Russian search works");
+            Check(!TraitBrowser.MatchesSearch("Ядовитая кожа", "Trait.Poison",
+                "PoisonDamage 20", "УРОН", "яд мана"), "search excludes wrong category");
+            Check(TraitBrowser.MatchesCategory(new [] { "ЗАЩИТА" }, "ВСЕ") &&
+                !TraitBrowser.MatchesCategory(new [] { "ЗАЩИТА" }, "МАНА"),
+                "category selection filters entries without losing them");
             Console.WriteLine("ALL PROGRESSION TESTS PASSED");
         }
         finally
