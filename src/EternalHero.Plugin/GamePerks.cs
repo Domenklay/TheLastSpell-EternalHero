@@ -127,6 +127,19 @@ namespace EternalHero.Plugin
             if(ReferenceEquals(owner,Plugin.Instance.CurrentHero)) __result=true;
         }
 
+        internal static UnityEngine.Sprite PerkIcon(string perkId)
+        {
+            if (string.IsNullOrWhiteSpace(perkId)) return null;
+            try
+            {
+                var defs = GameBridge.StaticGet(Database, "PerkDefinitions") as IDictionary;
+                if (defs != null && defs.Contains(perkId))
+                    return GameBridge.Get(defs[perkId], "PerkSprite") as UnityEngine.Sprite;
+            }
+            catch { }
+            return null;
+        }
+
         internal static int AvailablePerkPoints(object hero)
         {
             try { return Convert.ToInt32(GameBridge.Get(hero, "PerksPoints") ?? 0); }
