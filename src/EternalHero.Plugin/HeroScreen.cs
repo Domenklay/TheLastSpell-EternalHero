@@ -28,6 +28,8 @@ namespace EternalHero.Plugin
         private RectTransform rightPane, portraitSlot;
         private Image portraitImage;
         private int tab;
+        private int mainBranchChoice;
+        private int specialBranchChoice;
         private readonly List<Image> tabGraphics = new List<Image>();
         private string status = "";
         private float lastResolve;
@@ -246,11 +248,11 @@ namespace EternalHero.Plugin
                 24,505,320,72,16,muted,TextAnchor.UpperCenter);
             Action(left.transform,"EditAppearance",23,588,320,52,"РЕДАКТОР ВНЕШНОСТИ",() => mod.OpenAppearanceEditor(),true);
 
-            var tabs = new[] {"ГЕРОЙ","ЧЕРТЫ","РАЗВИТИЕ","ТЕХНИКИ","СВЕДЕНИЯ"};
+            var tabs = new[] {"ГЕРОЙ","ЧЕРТЫ","РАЗВИТИЕ","ТЕХНИКИ","ВОЗВЫШЕНИЕ","СВЕДЕНИЯ"};
             for (int i=0;i<tabs.Length;i++)
             {
                 int k=i;
-                var tabButton=Action(win.transform,"Tab-"+i,411 + i*196,118,190,48,tabs[i],
+                var tabButton=Action(win.transform,"Tab-"+i,411 + i*164,118,158,48,tabs[i],
                     () => { tab=k; Rebuild(); }, i==tab);
                 tabGraphics.Add(tabButton.GetComponent<Image>());
             }
@@ -310,6 +312,7 @@ namespace EternalHero.Plugin
                 case 1: DrawTraits(profile); break;
                 case 2: DrawProgression(profile, false); break;
                 case 3: DrawProgression(profile, true); break;
+                case 4: DrawAscension(profile); break;
                 default: DrawStatus(profile); break;
             }
         }
@@ -421,46 +424,119 @@ namespace EternalHero.Plugin
             },true);
         }
 
-        private void DrawProgression(HeroProfile p,bool special)
+        private void DrawProgression(HeroProfile p, bool special)
         {
-            FrameHeader(special?"ЗАПРЕТНЫЕ ТЕХНИКИ":"НАСЛЕДИЕ ГЕРОЯ",
-                special?"Постоянные специальные умения; не требуют экипированного оружия.":
-                "Развитие переживает смерть, поражение и начало следующего забега.");
-            Label(rightPane,"ЭССЕНЦИЯ: "+p.AvailableEssence+"   •   ОПЫТ: "+p.LifetimeExperience,
-                32,112,865,37,20,gold,TextAnchor.MiddleLeft,true);
-            var upgrades=UpgradeCatalog.All.Where(u=>special ? u.Branch=="Запретные техники":
-                u.Branch!="Запретные техники").ToList();
-            int count=upgrades.Count;
-            var body=Scroll(rightPane,25,163,943,414,count*113+14);
-            int i=0;
-            foreach(var u in upgrades)
+            var service = mod.Progression;
+            FrameHeader(special ? "ЗАПРЕТНЫЕ ТЕХНИКИ И ЭХА" : "НАСЛЕДИЕ ГЕРОЯ",
+                "Свободный порядок развития. Метаранг растёт вместе с изученными узлами.");
+            Label(rightPane, "МЕТАРАНГ " + service.MetaRank + "/100   •   ЭССЕНЦИЯ " +
+                p.AvailableEssence + "   •   УЗЛЫ " + service.PurchasedUpgradeRanks +
+                "/" + service.TotalUpgradeRanks, 29,109,921,34,19,gold,TextAnchor.MiddleLeft,true);
+
+            var choices = special ? new[] { "Запретные техники", "Триединство" } :
+                new[] { "Стальное тело", "Мастер оружия", "Тактический гений", "Наследие" };
+            int selected = Mathf.Clamp(special ? specialBranchChoice : mainBranchChoice, 0, choices.Length - 1);
+            float tabWidth = (926f - (choices.Length - 1) * 7f) / choices.Length;
+            for (int i=0;i<choices.Length;i++)
             {
-                int rank=mod.Progression.Rank(u.Id);
-                int y=9+113*i++;
-                Image(body,"Upgrade",10,y,900,104,card);
-                Label(body,u.Name+"   ["+rank+"/"+u.MaxRank+"]",25,y+7,626,28,
-                    19,gold,TextAnchor.MiddleLeft,true);
-                Label(body,u.Description,25,y+35,623,50,16,parchment,TextAnchor.UpperLeft);
-                if(rank<u.MaxRank)
-                {
-                    bool ok=mod.Progression.CanPurchase(u.Id,out var reason);
-                    var upgrade=u;
-                    var b=Action(body,"Buy-"+u.Id,698,y+25,193,50,
-                        "ИЗУЧИТЬ • "+u.CostForNextRank(rank),()=>{
-                            if(mod.Progression.Purchase(upgrade.Id,out string error))
-                            {
-                                Save();mod.ApplyCurrentHero();Notify("Изучено: "+upgrade.Name);
-                            }
-                            else Notify("Невозможно изучить: "+error);
-                        });
-                    b.interactable=ok;
-                }
-                else Label(body,"ИЗУЧЕНО",700,y+30,190,40,18,gold,TextAnchor.MiddleCenter,true);
+                int index=i;
+                Action(rightPane, "Branch" + i, 30 + i*(tabWidth+7f), 153, tabWidth, 43,
+                    choices[i].ToUpperInvariant(), () => {
+                        if (special) specialBranchChoice=index;
+                        else mainBranchChoice=index;
+                        Rebuild();
+                    }, i==selected);
             }
+            string branch=choices[selected];
+            var upgrades=UpgradeCatalog.All.Where(u=>u.Branch==branch).ToArray();
+            int completed=upgrades.Count(u=>service.Rank(u.Id)==u.MaxRank);
+            Label(rightPane,branch.ToUpperInvariant()+"   •   "+completed+"/16 освоено",
+                33,202,865,33,19,gold,TextAnchor.MiddleLeft,true);
+            var scroll=Scroll(rightPane,24,240,945,331,upgrades.Length*107+15);
+            int pos=0;
+            foreach (var upgrade in upgrades)
+            {
+                int rank=service.Rank(upgrade.Id);
+                int y=9+107*pos++;
+                Image(scroll,"Upgrade-"+upgrade.Id,10,y,896,99,card);
+                Label(scroll,upgrade.Name+"  ["+rank+"/"+upgrade.MaxRank+"]",
+                    23,y+5,650,31,18,rank==upgrade.MaxRank?gold:parchment,
+                    TextAnchor.MiddleLeft,true);
+                Label(scroll,upgrade.Description,23,y+38,651,51,15,muted,TextAnchor.UpperLeft);
+                if(rank==upgrade.MaxRank)
+                {
+                    Label(scroll,"ИЗУЧЕНО",696,y+29,186,42,17,gold,TextAnchor.MiddleCenter,true);
+                    continue;
+                }
+                bool can=service.CanPurchase(upgrade.Id,out string reason);
+                var node=upgrade;
+                var buy=Action(scroll,"Buy-"+upgrade.Id,693,y+25,186,48,
+                    "ИЗУЧИТЬ • "+upgrade.CostForNextRank(rank),()=>{
+                        if(service.Purchase(node.Id,out string error))
+                        {
+                            Save();
+                            mod.ApplyCurrentHero();
+                            Notify("Изучено: "+node.Name);
+                        }
+                        else Notify("Недоступно: "+error);
+                    });
+                buy.interactable=can;
+            }
+            Image(rightPane,"ProgressBack",30,588,917,17,new Color(.12f,.13f,.16f));
+            float progress=Mathf.Clamp01(service.Completion);
+            if(progress>.001f)
+                Image(rightPane,"ProgressFill",33,591,911f*progress,11,gold);
+            Label(rightPane,"Путь к рангу 100: "+service.PurchasedUpgradeRanks+"/"+service.TotalUpgradeRanks+
+                " улучшений • "+(service.Completion*100f).ToString("0.0")+"%",
+                30,610,920,31,17,parchment);
             Label(rightPane,special ?
-                "Боевые умения подготовлены в ModKit. Для активации необходимо подтверждение игрового API.":
-                "Бонусы пересчитываются для основного героя. Временный уровень внутри забега остаётся обычным.",
-                29,586,916,71,17,muted);
+                "Эхо охотника и эхо мага дают дополнительные атаки без затрат основных очков действий. Нужен TLS.ModKit." :
+                "При полной прокачке всех шести веток откроется бесконечное Возвышение.",
+                30,645,915,46,16,muted,TextAnchor.UpperLeft);
+        }
+
+        private void DrawAscension(HeroProfile p)
+        {
+            var service=mod.Progression;
+            FrameHeader("ВОЗВЫШЕНИЕ","После полного развития шести веток герой может усиливаться дальше.");
+            if(!service.MainTreeCompleted)
+            {
+                Label(rightPane,"ПОКА ЗАПЕЧАТАНО",37,139,920,60,30,gold,TextAnchor.MiddleCenter,true);
+                Label(rightPane,"Для открытия Возвышения необходимо изучить каждый ранг всех 96 узлов.\n\n"+
+                    "Общий прогресс: "+service.PurchasedUpgradeRanks+" / "+service.TotalUpgradeRanks+
+                    "\nМетаранг: "+service.MetaRank+" / 100\n\n"+
+                    "Ничего не сбрасывается: сохранённые черты и приобретённые способности останутся с героем.",
+                    54,225,890,277,21,parchment,TextAnchor.UpperCenter);
+                return;
+            }
+            Label(rightPane,"ВОЗВЫШЕНИЕ ОТКРЫТО  •  ЭССЕНЦИЯ "+p.AvailableEssence,
+                31,116,918,48,21,gold,TextAnchor.MiddleLeft,true);
+            int ix=0;
+            foreach (var upgrade in AscensionCatalog.All)
+            {
+                int col=ix%2, row=ix/2;
+                int x=27+col*472, y=186+row*145;
+                p.AscensionRanks.TryGetValue(upgrade.Id,out int rank);
+                Image(rightPane,"Ascension-"+upgrade.Id,x,y,453,131,card);
+                Label(rightPane,upgrade.Name+" [+"+rank+"]",x+13,y+7,429,32,
+                    20,gold,TextAnchor.MiddleLeft,true);
+                Label(rightPane,upgrade.Description,x+13,y+44,260,64,
+                    16,parchment,TextAnchor.UpperLeft);
+                var node=upgrade;
+                int cost=checked(5+2*rank);
+                var button=Action(rightPane,"Ascend-"+upgrade.Id,x+275,y+73,160,45,
+                    "УСИЛИТЬ • "+cost,()=>{
+                        if(service.PurchaseAscension(node.Id,out string error))
+                        {
+                            Save();mod.ApplyCurrentHero();Notify("Возвышение: "+node.Name);
+                        }
+                        else Notify("Не удалось: "+error);
+                    },true);
+                button.interactable=p.AvailableEssence>=cost;
+                ix++;
+            }
+            Label(rightPane,"Все повышения сохраняются между забегами. В текущем тестовом билде эффекты пересчитываются через игровой API.",
+                30,638,916,47,16,muted);
         }
 
         private RectTransform Scroll(Transform parent,float x,float y,float w,float h,int contentHeight)
@@ -495,6 +571,8 @@ namespace EternalHero.Plugin
         {
             FrameHeader("СВЕДЕНИЯ О ГЕРОЕ","Состояние интеграции с игровыми механиками и профиль.");
             string t="Имя: "+p.HeroName+"\nРаса: "+FormatRace(p.HeroRaceId)+
+                "\nМетаранг: "+mod.Progression.MetaRank+"/100   •   Узлов: "+
+                    mod.Progression.PurchasedUpgradeRanks+"/"+mod.Progression.TotalUpgradeRanks+
                 "\nПол: "+(p.HeroGender=="Female"?"Женщина":"Мужчина")+
                 "\nЗабегов: "+p.RunsStarted+"   Побед: "+p.Victories+
                 "\nПережито ночей: "+p.TotalNightsSurvived+
