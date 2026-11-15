@@ -151,7 +151,9 @@ namespace EternalHero.Plugin
             if (hero == null || string.IsNullOrWhiteSpace(id)) return false;
             var dictionary = GameBridge.Get(hero, "Perks") as IDictionary;
             if (dictionary == null || !dictionary.Contains(id)) return false;
-            return GameBridge.Get(dictionary[id], "Unlocked") is bool value && value;
+            // Item-granted buffs are not a purchased perk. Count only a perk
+            // explicitly unlocked by the playable character, not by equipment.
+            return GameBridge.Get(dictionary[id], "IsUnlockedFromPlayableUnit") is bool value && value;
         }
 
         // This works with the game's original PerkController, but does not add new columns
@@ -180,7 +182,8 @@ namespace EternalHero.Plugin
             try
             {
                 object controller;
-                if (perks.Contains(id))
+                bool wasExisting = perks.Contains(id);
+                if (wasExisting)
                 {
                     controller = GameBridge.Get(perks[id], "PerkController");
                     if (controller == null) { error = "Нет контроллера существующего перка"; return false; }
@@ -224,11 +227,19 @@ namespace EternalHero.Plugin
                 { error = "Игра отказалась активировать перк"; return false; }
                 if (!GameBridge.Set(hero, "PerksPoints", points - 1))
                 {
-                    // Fail closed when point storage changed: reverse the unlock we made.
-                    var lockWithoutArgs=controller.GetType().GetMethods().FirstOrDefault(m =>
-                        m.Name == "LockAndClearUnlockers" && m.GetParameters().Length == 1);
-                    try { lockWithoutArgs?.Invoke(controller, new object[] { true }); }
-                    catch { }
+                    // Roll back only our playable-unit unlocker; never remove an
+                    // existing item-granted perk or the vanilla tree's perk object.
+                    var lockMethod=controller.GetType().GetMethods().FirstOrDefault(m =>
+                        m.Name == "Lock" && m.GetParameters().Length == 1 &&
+                        m.GetParameters()[0].ParameterType.IsInstanceOfType(hero));
+                    try {
+                        lockMethod?.Invoke(controller, new[] { hero });
+                        if (!wasExisting && perks.Contains(id)) perks.Remove(id);
+                    }
+                    catch (Exception rollbackError) {
+                        log.LogWarning("Eternal Hero perk rollback failed: " +
+                            rollbackError.GetBaseException().Message);
+                    }
                     error = "Не удалось списать очко — покупка отменена";
                     return false;
                 }
