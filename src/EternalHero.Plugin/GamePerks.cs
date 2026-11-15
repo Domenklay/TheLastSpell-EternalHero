@@ -10,6 +10,41 @@ namespace EternalHero.Plugin
 {
     internal static class GamePerks
     {
+        private sealed class MetaPointsLedger { internal int RankApplied; }
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, MetaPointsLedger>
+            MetaPoints = new System.Runtime.CompilerServices.ConditionalWeakTable<object, MetaPointsLedger>();
+
+        private static int BonusRank(HeroProfile profile) =>
+            profile?.Ranks != null && profile.Ranks.TryGetValue("legacy.perk", out int rank)
+                ? Math.Max(0, Math.Min(8, rank)) : 0;
+
+        internal static void PrimeLoadedPerkPoints(object hero, HeroProfile profile)
+        {
+            if (hero == null) return;
+            var ledger = MetaPoints.GetValue(hero, _ => new MetaPointsLedger());
+            // The game save already has the perk-point bonus from earlier ranks.
+            ledger.RankApplied = BonusRank(profile);
+        }
+
+        internal static int ApplyMetaPerkPoints(object hero, HeroProfile profile, ManualLogSource log)
+        {
+            if (hero == null || profile == null) return 0;
+            var ledger = MetaPoints.GetValue(hero, _ => new MetaPointsLedger());
+            int rank = BonusRank(profile);
+            int delta = Math.Max(0, rank - ledger.RankApplied);
+            if (delta == 0) return 0;
+            int before = AvailablePerkPoints(hero);
+            if (!GameBridge.Set(hero, "PerksPoints", before + delta))
+            {
+                log.LogWarning("Eternal Hero: meta perk-point injection unavailable");
+                return 0;
+            }
+            ledger.RankApplied = rank;
+            log.LogInfo("Eternal Hero: granted "+delta+
+                " additional original perk points from legacy.perk");
+            return delta;
+        }
+
         private const string Database = "TheLastStand.Database.Unit.PlayableUnitDatabase";
         public sealed class Option
         {
