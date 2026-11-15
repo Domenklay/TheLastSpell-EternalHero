@@ -244,10 +244,11 @@ namespace EternalHero.Plugin
                 // GameView.TopScreenPanel.UnitPortraitsPanel.RefreshPortraits()
                 var top = StaticGet("TheLastStand.View.GameView", "TopScreenPanel");
                 if (top != null) Call(Get(top, "UnitPortraitsPanel"), "RefreshPortraits");
-                var sheet = Singleton("TheLastStand.View.CharacterSheetPanel");
+                var sheet = Singleton("TheLastStand.View.CharacterSheet.CharacterSheetPanel");
                 if (sheet != null)
                 {
-                    Call(sheet, "RefreshAvatar");
+                    Call(sheet, "RefreshAvatar", hero);
+                    Call(sheet, "RefreshName", hero);
                     Call(sheet, "RefreshPortrait", hero);
                 }
             }
