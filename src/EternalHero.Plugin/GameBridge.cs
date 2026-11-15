@@ -199,7 +199,7 @@ namespace EternalHero.Plugin
             }
 
             var existing = Get(hero, "UnitTraitDefinitions") as IEnumerable;
-            int max = Math.Min(4, 1 + (profile.Ranks != null &&
+            int max = Math.Min(6, 1 + (profile.Ranks != null &&
                 profile.Ranks.TryGetValue("legacy.trait", out int ranks) ? ranks : 0));
             int added = 0;
             foreach (var id in (profile.SelectedTraits ?? new List<string>()).Distinct().Take(max))
