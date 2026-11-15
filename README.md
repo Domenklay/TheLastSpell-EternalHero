@@ -1,23 +1,30 @@
-# The Last Spell — Eternal Hero / Вечный защитник
+# Eternal Hero — Вечный защитник для The Last Spell
 
 [![Build](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml/badge.svg)](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
 
-## v0.8.0 — racial debuffs, expanded traits and 4-column UI
+## v0.9 — полный доступ к игровым перкам
 
-Changes since v0.7:
+Новый важный этап развития постоянного главного героя. Обычная The Last Spell показывает **6 случайных колонок перков**, и её оригинальный UI нельзя безопасно расширить произвольными колонками без переделки Unity-префаба. Поэтому теперь герой получает **собственную библиотеку всех игровых перков** в моде.
 
-- **12 selectable permanent traits (plus randomly generated vanilla traits)**: the "Закалённый ветеран" node now has 11 ranks, each unlocking one additional selection. This preserves the same upgrade ID in older profiles. Original game's character sheet has a limited number of visible trait icons. All trait definitions reside on the hero regardless of how many it displays.
-- **Compact 4-column trait/perk grid**: 20 entries per page, thinner rows, search by name/ID/effect and 4 filters — All, Without Penalties, With Penalties, Selected. Filters use actual trait stat and slot modifiers.
-- **Negative race modifiers are neutralized only for Eternal Hero**: native racial stats with a negative Race component are compensated on reading the final stat. Negative `StatModifierEffect.Value` and `DynamicStatsModifierEffect.Value` belonging to racial perks are masked; **positive racial bonuses remain**. This includes conditional penalties like the red damage penalty in racial-perk descriptions. Original tooltips may still display the original negative text, because localization is not altered.
-- **All five vanilla perk tiers accessible** to the protagonist irrespective of preceding perk purchases through a Harmony override of the native tier availability getter. The game's random selection of six perk columns is unchanged; permanent perks from other columns can be selected in the mod's perk catalogue. Vanilla perk-point costs for native tree purchases remain unchanged.
-- All changes affect **the protagonist only**. Other party members keep their vanilla races, perks and traits. The UI shows whether racial penalty suppression is enabled.
-- Metaprogression, permanent stats and achievements, save profile, portrait/race/trait persistence are retained.
+### Что реализовано
 
-**Status:** code compiles in GitHub Actions and persistence tests pass. Actual game runtime behavior, especially the damage suppression inside conditional racial perks, still requires a new-run smoke test.
+- **Черты → Перки → ПОСТОЯННЫЕ** — прежний список перков из профиля. Они сохраняются между забегами и применяются к главному герою.
+- **Черты → Перки → ЗАБЕГ** — новая библиотека. Показывает все доступные `PerkDefinition` игры, даже отсутствующие в шестиколоночном дереве. Выбираешь перк, он изучается за **одно обычное очко особых черт**, если оно есть.
+- Для покупки используется оригинальный `PerkController.Unlock`; начисление происходит **до списания очка**, а деньги снимаются только при подтверждении разблокировки. Повторно купить уже изученное нельзя.
+- Перки, изученные в режиме «Забег», создаются как **dynamic perks**, предусмотренные штатной сериализацией персонажа. Они должны сохраняться в **игровом сохранении текущего забега**, но не становятся постоянным выбором в профиле.
+- Библиотека отображает **оригинальные иконки перков, их категории и уровни**, найденные в игровых `UnitPerkCollectionDefinitions`. Поиск работает и по категории.
+- **Наследник знаний** (8 рангов): теперь каждый купленный ранг добавляет **+1 обычное очко перков** в каждом новом забеге, до +8. Старые покупки этого узла переносятся без сброса.
+- Исправлена ошибка: выбранный постоянный перк, который уже существовал в игровом дереве, но был ещё заблокирован, теперь проходит настоящую проверку/активацию вместо простого наличия ID.
+- Дополнительные очки выдаются только ГГ; на загрузке сохранения повторная выдача исключена. Остальные персонажи, их деревья и игровые валюты не меняются.
+- Сохранены v0.8: 96 метаузлов, 12 дополнительных черт, подавление расовых штрафов ГГ, 6 боевых XML, Возвышение и личные достижения.
 
-## Downloads
-[GitHub Actions](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml) → latest **green** run → artifact **EternalHero-v0.8**.
+### Ограничения
 
-[Installation and verification](docs/INSTALL.md) · [Progression](docs/META_PROGRESSION.md) · [Roadmap](docs/ROADMAP.md)
+- **Это дополнительный экран перков, а не расширение оригинальных шести колонок.**
+- Библиотека не должна выдавать очки бесплатно: нужны реальные очки, полученные за уровни или от метаталанта «Наследник знаний».
+- Обработка активных навыков, переноса нестандартных перков в игровое сохранение и воспроизводимость на разных версиях игры **требуют теста в работающей игре**. CI проверяет сборку и отдельные тесты системы прогрессии, но не игру.
+- Старайся не изучать через библиотеку перки, явно рассчитанные только на определённый квест, предмет или сюжетный триггер: некоторые из них могут иметь скрытые условия.
 
-This repository distributes no copyrighted game textures, original game binaries or fonts.
+[Инструкция установки v0.9](docs/INSTALL.md) · [План разработки](docs/ROADMAP.md) · [GitHub Actions — сборки](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
+
+Репозиторий не распространяет игровые DLL, оригинальные спрайты и шрифты. Иконки берутся из запущенной игры.
