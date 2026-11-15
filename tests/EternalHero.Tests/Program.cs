@@ -83,6 +83,8 @@ internal static class Program
 
             Check(UpgradeCatalog.Find("legacy.trait").MaxRank == 11,
                 "up to twelve independent selected permanent traits are supported");
+            Check(UpgradeCatalog.Find("legacy.perk").MaxRank == 8,
+                "eight purchasable permanent legacy perk-point ranks");
             Check(UpgradeCatalog.All.Count == 96, "all 96 upgrades registered");
             Check(UpgradeCatalog.Branches.Count == 6, "six specialization branches");
             Check(UpgradeCatalog.All.Select(u => u.Id).Distinct().Count() == 96, "upgrade IDs unique");

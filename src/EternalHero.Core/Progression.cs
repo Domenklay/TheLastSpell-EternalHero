@@ -92,7 +92,7 @@ namespace EternalHero.Core
                 "tactics.mobility", 2),
             new Upgrade("legacy.trait", "Наследие", "Закалённый ветеран", "Открывает дополнительную существующую черту", 11, 6,
                 requiresGameIntegration: true),
-            new Upgrade("legacy.perk", "Наследие", "Наследник знаний", "Открывает постоянный существующий перк", 8, 7,
+            new Upgrade("legacy.perk", "Наследие", "Наследник знаний", "Даёт +1 очко обычных перков за ранг в каждом забеге", 8, 7,
                 requiresId: "legacy.trait", requiresRank: 1, requiresGameIntegration: true),
             new Upgrade("legacy.mastery", "Наследие", "Универсал", "Усиление эффектов каждого типа оружия", 5, 5,
                 requiresId: "legacy.perk", requiresRank: 1, requiresGameIntegration: true),

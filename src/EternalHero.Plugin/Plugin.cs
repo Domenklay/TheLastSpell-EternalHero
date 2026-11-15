@@ -14,7 +14,7 @@ namespace EternalHero.Plugin
     public sealed class Plugin : BaseUnityPlugin
     {
         internal const string Id = "domenklay.tls.eternalhero";
-        internal const string Version = "0.8.0";
+        internal const string Version = "0.9.0";
 
         private Harmony harmony;
         private ProfileStore store;
@@ -166,7 +166,10 @@ namespace EternalHero.Plugin
             // On a loaded save, do not apply old base-stat bonuses twice.
             // Identity, portrait and selected perks are independent and MUST be synchronized.
             if (progression != null)
+            {
                 HeroRuntime.PrimeFromLoadedSave(found, progression.CalculatedStatBonuses());
+                GamePerks.PrimeLoadedPerkPoints(found, Profile);
+            }
             try
             {
                 if (Profile != null)
@@ -311,6 +314,8 @@ namespace EternalHero.Plugin
                 string skills = GameSkills.Grant(currentHero, Profile, Logger);
                 Logger.LogInfo("Eternal Hero active skills: " + skills);
                 Logger.LogInfo("Eternal Hero permanent perks: " + GamePerks.Grant(currentHero, Profile, Logger));
+                Logger.LogInfo("Eternal Hero granted additional vanilla perk points: " +
+                    GamePerks.ApplyMetaPerkPoints(currentHero, Profile, Logger));
                 Logger.LogInfo("Eternal Hero stat API: " + HeroRuntime.DiagnosticStatSurface(currentHero));
                 Logger.LogInfo("Eternal Hero ability API: " + GameApiProbe.HeroAbilityMethods(currentHero));
                 Logger.LogInfo("Eternal Hero skill definitions: " + GameApiProbe.SkillDefinitions());
