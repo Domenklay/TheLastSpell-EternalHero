@@ -133,6 +133,8 @@ namespace EternalHero.Plugin
             currentHero = found;
             rosterStatus = "Герой найден в загруженном забеге. Сохранённые характеристики не начисляются повторно.";
             Logger.LogInfo("Eternal Hero: loaded first hero from existing save; skipping stat reapplication.");
+            if (progression != null)
+                HeroRuntime.PrimeFromLoadedSave(found, progression.CalculatedStatBonuses());
             if (Profile != null && Profile.CreationConfirmed)
             {
                 Logger.LogInfo("Eternal Hero resumed active skills: " + GameSkills.Grant(found, Profile, Logger));
