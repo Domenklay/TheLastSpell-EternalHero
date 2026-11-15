@@ -1,30 +1,25 @@
-# Eternal Hero / Вечный защитник — The Last Spell
+# The Last Spell — Eternal Hero / Вечный защитник
 
-[![Build](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml/badge.svg)](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
+[![CI](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml/badge.svg)](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
 
-**v0.5.0 — six-branch metaprogression**. The goal is a persistent protagonist who can eventually do the work of three ordinary heroes in one run.
+## v0.6 — compact UI + first-slot protagonist restoration
 
-## What's built
+Compared with v0.5:
 
-- **96 upgrade nodes** across six branches: Стальное тело (16), Мастер оружия (16), Тактический гений (16), Наследие (16), Запретные техники (16), Триединство (16).
-- The rank 1–100 indicator is based on completion of all available upgrade ranks (not game XP level). Main-tree completion unlocks **Ascension**, with six repeatable increases after maxing every node.
-- A native Unity UGUI screen now offers category switching and displays only 16 upgrades per branch, their prerequisites, ranks and essence prices. Ascension has its own sixth tab.
-- **Six special skill definitions**, requiring [TLS.ModKit](https://github.com/stunl0ck/tls-modkit): Ghost Shot, Ether Slash, Arcane Pulse, Hunter Echo, Mage Echo, and Spectral Follow-up.
-- Hunter/Mage Echo and follow-up are defined as **0 AP / 0 mana, once-per-turn native skills**. They do NOT spawn separate monsters/characters or automatically fire; user selects the extra skill. Hero skill list is updated through the game's SkillController if available. Real gameplay needs confirmation.
-- Existing game traits and **permanent vanilla perks**, with selection slots unlocked through meta upgrades, saved to JSON and applied via native AddTrait and PerkController to the protagonist only.
-- Meta bonuses calculated across purchased ordinary + ascension ranks. Stat delta handling prevents reapplication of old stat bonuses after loading a game save.
-- Original v0.4 profile data is kept. Existing node IDs are unchanged; existing trait slots and XP carry over.
-- Existing night reward/event ledger and separate character-creator profile are retained.
+- The character editor renders at 78% of its previous size, centered in the game with a lighter backdrop.
+- The floating launcher moves **out of the top-right 3-hero portraits**, becoming a small **✦** tab on the **right edge at half-screen height**. F8/F9/Home still work.
+- No automatic menu takeover on launch (new configuration setting `OpenCreatorOnStartupV06=false`).
+- Important gameplay fix: the first character in an **existing loaded save** now receives the permanent protagonist's identity, portrait, chosen race and traits, instead of the previous behavior that only recognized the hero without applying these settings.
+- The CreateStartUnits hook always attempts to apply the protagonist, including profiles without the older `CreationConfirmed` flag.
+- Refresh calls for the original in-game portrait, character model and HUD names are attempted after changing the character.
+- Existing-save stat bonuses are **not re-added**, to avoid doubling them; new upgrade deltas still work where supported.
+- Missed save-load hooks can recover by scanning the roster periodically.
+- Persistent meta XP, 96 upgrades, 6 branches, skill XML and perk slots are unchanged.
 
-## Not yet finished
-Real-game QA is required to confirm skill XML parsing, native-perk activation, individual spell cooldowns/weapon-independent targeting, UI at different resolutions, safe portrait restoration and full 3-hero solo performance. Automatic boss/victory rewards, an actual one-hit resurrection mechanic (Последний бастион), and a dedicated teleport skill are **not implemented** yet. Echo attacks currently do not have separate spectral clones or custom VFX; they reuse available game effects.
+**What this does not do:** spawn a fourth ally. It **replaces the first starting/loaded character** as originally requested, keeping the starting roster at three. It also does not yet guarantee the exact same avatar on every version of the game. Game version-specific tests are required.
 
-## Download
-[GitHub Actions — successful builds](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml): open the newest green run and download **EternalHero-v0.5** under Artifacts. The artifact contains `EternalHero-v0.5.zip`, to extract into the game directory.
+## Installation and download
 
-## Documents
-- [Installation and test checklist (RU)](docs/INSTALL.md)
-- [Progression mechanics (RU)](docs/META_PROGRESSION.md)
-- [Roadmap and known limitations (RU)](docs/ROADMAP.md)
+[Latest GitHub Actions builds](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml) → successful run → artifact **EternalHero-v0.6**. Extract the internal ZIP into the root of The Last Spell, replacing both DLLs.
 
-Requires BepInEx 5 x64, The Last Spell, and TLS.ModKit for custom skill definitions. No game assets, DLLs or fonts are published in this repository.
+See [Russian install/test instructions](docs/INSTALL.md), [progression design](docs/META_PROGRESSION.md), and [roadmap](docs/ROADMAP.md). Backup saves first. Mod requires BepInEx 5 x64. TLS.ModKit is required for the custom combat skill definitions.
