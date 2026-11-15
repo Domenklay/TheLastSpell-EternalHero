@@ -32,9 +32,15 @@ namespace EternalHero.Plugin
         private int specialBranchChoice;
         private bool choosePerks;
         private bool perkRunMode;
-        private int traitPage;
         private int traitFilter;
+        private int traitCategory;
         private string traitSearch = "";
+        private RectTransform traitResultsHost;
+        private Text traitDetailLabel;
+        private string traitDetails = "Нажми на значок ? возле черты, чтобы увидеть её полный эффект.";
+        private TraitEntry[] traitCache;
+        private TraitEntry[] perkCache;
+        private string cachedTraitRace;
         private readonly List<Image> tabGraphics = new List<Image>();
         private string status = "";
         private float lastResolve;
@@ -388,182 +394,274 @@ namespace EternalHero.Plugin
                 case "Dwarf":return "Дворф";default:return id??"Человек";}
         }
 
-        // Dense 4-column catalogue. Each row shows four native traits with a small
-        // effect preview; the filter and search work on actual game database IDs.
+        // Filter-first, live-search catalogue, not a 100-page list.
+        // Controls are stable while typing. Only the RESULT panel is rebuilt.
         private void DrawTraits(HeroProfile p)
         {
-            int traitSlots = Math.Min(12, 1 + mod.Progression.Rank("legacy.trait"));
-            FrameHeader("ЧЕРТЫ И ПОСТОЯННЫЕ ПЕРКИ",
-                "Выбранные способности сохраняются. Обычная карточка показывает лишь первые черты.");
-            Action(rightPane, "TraitSub", 30,110,458,43,
-                "ЧЕРТЫ  •  "+(p.SelectedTraits?.Count??0)+"/"+traitSlots,()=>{
-                    choosePerks=false;perkRunMode=false;traitPage=0;traitFilter=0;traitSearch="";Rebuild();
+            int slots=Math.Min(12,1+mod.Progression.Rank("legacy.trait"));
+            FrameHeader("КАТАЛОГ ЧЕРТ И ПЕРКОВ",
+                "Поиск, категории и прокрутка без переключения страниц.");
+            Action(rightPane,"TraitSub",30,107,460,40,
+                "ЧЕРТЫ  •  "+(p.SelectedTraits?.Count??0)+"/"+slots,()=>{
+                    choosePerks=false;perkRunMode=false;traitFilter=0;
+                    traitCategory=0;traitSearch="";traitDetails="";
+                    Rebuild();
                 },!choosePerks);
-            Action(rightPane, "PerkSub", 495,110,458,43,
-                "ПЕРКИ  •  "+(p.SelectedPerks?.Count??0)+" / ВСЕ",()=>{
-                    choosePerks=true;perkRunMode=false;traitPage=0;traitFilter=0;traitSearch="";Rebuild();
+            Action(rightPane,"PerkSub",495,107,460,40,
+                "ПЕРКИ  •  "+(p.SelectedPerks?.Count??0)+" ПОСТ.",()=>{
+                    choosePerks=true;perkRunMode=false;traitFilter=0;
+                    traitCategory=0;traitSearch="";traitDetails="";
+                    Rebuild();
                 },choosePerks);
-            int max = choosePerks ? int.MaxValue : traitSlots;
+
             if(choosePerks)
             {
-                Action(rightPane,"PermanentPerks",32,162,443,31,"ПОСТОЯННЫЕ",()=>{
-                    perkRunMode=false;traitPage=0;traitFilter=0;Rebuild();
+                Action(rightPane,"PermanentPerks",30,150,456,32,"ПОСТОЯННЫЕ",()=>{
+                    perkRunMode=false;traitFilter=0;traitSearch="";Rebuild();
                 },!perkRunMode);
-                Action(rightPane,"RunPerks",486,162,465,31,
-                    "ЗАБЕГ  •  ОЧКОВ "+GamePerks.AvailablePerkPoints(mod.CurrentHero),()=>{
-                    perkRunMode=true;traitPage=0;traitFilter=0;Rebuild();
-                },perkRunMode);
+                Action(rightPane,"RunPerks",492,150,463,32,
+                    "В ЗАБЕГЕ  •  ОЧКОВ "+GamePerks.AvailablePerkPoints(mod.CurrentHero),()=>{
+                        perkRunMode=true;traitFilter=0;traitSearch="";Rebuild();
+                    },perkRunMode);
             }
-            else Label(rightPane,
-                "ДОПОЛНИТЕЛЬНЫХ ЧЕРТ: "+(p.SelectedTraits?.Count??0)+"/"+traitSlots+
-                "  •  до 12 + обычные стартовые",
-                32,162,920,32,17,gold,TextAnchor.MiddleLeft,true);
-            Field(rightPane,32,197,922,42,traitSearch,"Найти по названию или эффекту...",v=>{
-                traitSearch=(v??"").Trim();traitPage=0;Rebuild();
-            },70);
+            else
+                Label(rightPane,"СВОБОДНЫХ СЛОТОВ: "+Math.Max(0,slots-(p.SelectedTraits?.Count??0))+
+                    "  •  Выбранные черты применяются к главному герою",33,149,922,33,
+                    16,gold,TextAnchor.MiddleLeft,true);
 
-            var traits = choosePerks?null:GameBridge.Traits();
-            var perks = choosePerks?GamePerks.Available():null;
-            var entries = choosePerks
-                ? perks.Select(x=>new TraitEntry {
-                      Id=x.Id,Name=x.Name,Description=x.Id,
-                      Category=x.Collection,Tier=x.Tier
-                  }).ToArray()
-                : traits.Select(x=>new TraitEntry {
-                      Id=x.Id,Name=x.Name,
-                      Description=string.IsNullOrWhiteSpace(x.Description)
-                          ? "Нет числовых эффектов" : x.Description,
-                      Restricted=x.ForbiddenRaces.Contains(p.HeroRaceId),
-                      HasDrawbacks=x.HasDrawbacks
-                  }).ToArray();
-            var chosenIds=choosePerks?p.SelectedPerks:p.SelectedTraits;
-            bool runMode=choosePerks && perkRunMode;
-            Func<string,bool> selectedById = id => runMode
+            var input=Field(rightPane,31,187,800,40,traitSearch,
+                "Начни вводить название или эффект — список обновится сразу",null,80);
+            input.onValueChanged.AddListener(value=>{
+                traitSearch=value??"";
+                RefreshTraitResults(p);
+            });
+            Action(rightPane,"ClearSearch",843,187,111,40,"ОЧИСТИТЬ",()=>{
+                if(input.text.Length>0) input.text="";
+                else {traitSearch="";RefreshTraitResults(p);}
+                input.ActivateInputField();
+            });
+            var host=Image(rightPane,"TraitResults",26,232,941,337,slate);
+            traitResultsHost=host.GetComponent<RectTransform>();
+            traitDetailLabel=Label(rightPane,traitDetails,30,570,925,29,
+                14,muted,TextAnchor.MiddleLeft);
+            RefreshTraitResults(p);
+        }
+
+        private TraitEntry[] GetTraitEntries(HeroProfile profile)
+        {
+            if (choosePerks)
+            {
+                if(perkCache==null||perkCache.Length==0)
+                    perkCache=GamePerks.Available().Select(x=>new TraitEntry{
+                        Id=x.Id,Name=x.Name,Category=x.Collection,Tier=x.Tier,
+                        Description=x.Id,Categories=new[]{"ОСОБЫЕ"}
+                    }).ToArray();
+                return perkCache;
+            }
+            if(traitCache==null||traitCache.Length==0||cachedTraitRace!=profile.HeroRaceId)
+            {
+                cachedTraitRace=profile.HeroRaceId;
+                traitCache=GameBridge.Traits().Select(x=>new TraitEntry{
+                    Id=x.Id,Name=x.Name,
+                    Description=string.IsNullOrWhiteSpace(x.Description)
+                        ?"Нет числовых эффектов":x.Description,
+                    Restricted=x.ForbiddenRaces.Contains(profile.HeroRaceId),
+                    HasDrawbacks=x.HasDrawbacks,
+                    Categories=TraitBrowser.CategoriesFor(x.StatIds)
+                }).ToArray();
+            }
+            return traitCache;
+        }
+
+        private void RefreshTraitResults(HeroProfile profile)
+        {
+            if(traitResultsHost==null||!traitResultsHost) return;
+            foreach(Transform child in traitResultsHost.Cast<Transform>().ToArray())
+                UnityEngine.Object.Destroy(child.gameObject);
+            var entries=GetTraitEntries(profile);
+            var selected=choosePerks?profile.SelectedPerks:profile.SelectedTraits;
+            bool runMode=choosePerks&&perkRunMode;
+            Func<string,bool> isSelected=id=>runMode
                 ? GamePerks.IsLearned(mod.CurrentHero,id)
-                : chosenIds!=null && chosenIds.Contains(id);
-            string filterText=traitSearch.Trim();
-            IEnumerable<TraitEntry> filtered=entries;
-            if(!string.IsNullOrWhiteSpace(filterText))
-                filtered=filtered.Where(x=>
-                    x.Name.IndexOf(filterText,StringComparison.OrdinalIgnoreCase)>=0 ||
-                    x.Id.IndexOf(filterText,StringComparison.OrdinalIgnoreCase)>=0 ||
-                    (x.Description??"").IndexOf(filterText,StringComparison.OrdinalIgnoreCase)>=0 ||
-                    (x.Category??"").IndexOf(filterText,StringComparison.OrdinalIgnoreCase)>=0);
+                : selected!=null&&selected.Contains(id);
+
+            IEnumerable<TraitEntry> query=entries;
+            if(!string.IsNullOrWhiteSpace(traitSearch))
+                query=query.Where(x=>TraitBrowser.MatchesSearch(
+                    x.Name,x.Id,x.Description,
+                    choosePerks?x.Category:string.Join(" ",x.Categories??new string[0]),traitSearch));
             if(!choosePerks)
             {
-                if(traitFilter==1) filtered=filtered.Where(x=>!x.HasDrawbacks);
-                else if(traitFilter==2) filtered=filtered.Where(x=>x.HasDrawbacks);
-                else if(traitFilter==3) filtered=filtered.Where(x=>selectedById(x.Id));
+                if(traitFilter==1) query=query.Where(x=>!x.HasDrawbacks);
+                if(traitFilter==2) query=query.Where(x=>x.HasDrawbacks);
+                if(traitFilter==3) query=query.Where(x=>isSelected(x.Id));
+                if(traitFilter==4) query=query.Where(x=>!x.Restricted);
+                if(traitCategory>0&&traitCategory<TraitBrowser.Categories.Length)
+                {
+                    string category=TraitBrowser.Categories[traitCategory];
+                    query=query.Where(x=>TraitBrowser.MatchesCategory(x.Categories,category));
+                }
             }
-            else if(traitFilter>0)
-                filtered=filtered.Where(x=>selectedById(x.Id));
-            var eligible=filtered.OrderByDescending(x=>selectedById(x.Id))
+            else if(traitFilter>0) query=query.Where(x=>isSelected(x.Id));
+
+            var filtered=query.OrderByDescending(x=>isSelected(x.Id))
                 .ThenBy(x=>choosePerks?x.Category:x.Name)
                 .ThenBy(x=>choosePerks?x.Tier:0)
                 .ThenBy(x=>x.Name).ToArray();
 
             string[] filters=choosePerks?
-                new[]{"ВСЕ ПЕРКИ",runMode?"ИЗУЧЕННЫЕ":"ВЫБРАННЫЕ"}:
-                new[]{"ВСЕ","БЕЗ ШТРАФОВ","СО ШТРАФАМИ","ВЫБРАННЫЕ"};
-            float fw=(923f-(filters.Length-1)*6f)/filters.Length;
+                new[]{"ВСЕ ПЕРКИ",runMode?"ИЗУЧЕННЫЕ":"ПОСТОЯННЫЕ"}:
+                new[]{"ВСЕ","БЕЗ ШТРАФОВ","СО ШТРАФАМИ","ВЫБРАННЫЕ","ДОСТУПНЫЕ"};
+            float filterWidth=(925f-6f*(filters.Length-1))/filters.Length;
             for(int i=0;i<filters.Length;i++)
             {
-                int selected=i;
-                Action(rightPane,"Filter-"+i,32+i*(fw+6f),246,fw,37,filters[i],()=>{
-                    traitFilter=selected;traitPage=0;Rebuild();
-                },i==traitFilter);
+                int selectedFilter=i;
+                Action(traitResultsHost,"TraitFilter"+i,8+i*(filterWidth+6),4,
+                    filterWidth,33,filters[i],()=>{
+                        traitFilter=selectedFilter;
+                        RefreshTraitResults(profile);
+                    },traitFilter==i);
             }
 
-            const int columns=4, rows=5, perPage=columns*rows;
-            int pages=Math.Max(1,(eligible.Length+perPage-1)/perPage);
-            traitPage=Mathf.Clamp(traitPage,0,pages-1);
-            var visible=eligible.Skip(traitPage*perPage).Take(perPage).ToArray();
-            var list=Scroll(rightPane,25,291,943,277,rows*58+13);
-            const float margin=8f,gap=6f;
-            float cw=(915f-3*gap)/4f;
-            for(int i=0;i<visible.Length;i++)
+            int listY=choosePerks?52:128;
+            if(!choosePerks)
             {
-                var entry=visible[i];
-                int col=i%columns,row=i/columns;
-                float x=margin+col*(cw+gap),y=7+row*58;
-                bool chosen=selectedById(entry.Id);
-                var selectedEntry=entry;
-                var tile=Action(list,"Pick-"+entry.Id,x,y,cw,53,"",()=>{
-                    if(runMode)
-                    {
-                        if(GamePerks.PurchaseAnyPerk(mod.CurrentHero,selectedEntry.Id,log,
-                            out string error))
-                            Notify("Изучен перк за 1 очко: "+selectedEntry.Name);
-                        else Notify("Не удалось изучить: "+error);
-                        return;
-                    }
-                    var selected=choosePerks?p.SelectedPerks:p.SelectedTraits;
-                    if(selected==null)
-                    {
-                        selected=new List<string>();
-                        if(choosePerks)p.SelectedPerks=selected;
-                        else p.SelectedTraits=selected;
-                    }
-                    if(selected.Contains(selectedEntry.Id))
-                        selected.Remove(selectedEntry.Id);
-                    else if(selected.Count<max && !selectedEntry.Restricted)
-                        selected.Add(selectedEntry.Id);
-                    else
-                    {
-                        status="Недостаточно слотов либо черта недоступна для расы";
-                        Rebuild();
-                        return;
-                    }
-                    Save();
-                    mod.ApplyCurrentHero();
-                    Rebuild();
-                },chosen);
-                tile.interactable=runMode
-                    ? !chosen && mod.CurrentHero!=null &&
-                        GamePerks.AvailablePerkPoints(mod.CurrentHero)>0
-                    : chosen || (!entry.Restricted && max>0);
-                float textLeft=7f;
-                if(choosePerks)
+                var categories=TraitBrowser.Categories;
+                for(int i=0;i<categories.Length;i++)
                 {
-                    var sprite=GamePerks.PerkIcon(entry.Id);
-                    if(sprite)
-                    {
-                        var icon=Image(tile.transform,"NativePerkIcon",5,5,42,42,
-                            Color.white,sprite);
-                        icon.GetComponent<Image>().preserveAspect=true;
-                        textLeft=53f;
-                    }
+                    int selectedCategory=i;
+                    string cat=categories[i];
+                    int count=i==0?entries.Length:
+                        entries.Count(x=>TraitBrowser.MatchesCategory(x.Categories,cat));
+                    const float chipW=224f;
+                    int row=i/4, col=i%4;
+                    Action(traitResultsHost,"TraitCategory"+i,8+col*232,42+row*36,
+                        chipW,30,cat+"  "+count,()=>{
+                            traitCategory=selectedCategory;
+                            RefreshTraitResults(profile);
+                        },traitCategory==i);
                 }
-                Label(tile.transform,(chosen?"✓ ":"")+entry.Name,textLeft,2,cw-textLeft-7,24,16,
-                    chosen?gold:parchment,TextAnchor.MiddleLeft,true);
-                string category = string.IsNullOrEmpty(entry.Category)?"Общие":entry.Category;
-                string preview=runMode
-                    ? category+" • "+(chosen?"ИЗУЧЕНО":GamePerks.AvailablePerkPoints(mod.CurrentHero)>0
-                        ?"1 ОЧКО":"НЕТ ОЧКОВ")
-                    : choosePerks
-                        ? category+" • УР. "+entry.Tier
-                        : entry.Restricted?"Недоступна расе":entry.Description??"";
-                if(preview.Length>36)preview=preview.Substring(0,33)+"...";
-                Label(tile.transform,preview,textLeft,29,cw-textLeft-7,19,12,muted,TextAnchor.MiddleLeft);
             }
-            if(eligible.Length==0)
-                Label(rightPane,"Нет подходящих записей. Измени фильтр или строку поиска.",
-                    36,340,908,72,19,parchment,TextAnchor.MiddleCenter);
 
-            Action(rightPane,"Prev",36,579,173,41,"◀ НАЗАД",()=>{
-                traitPage=Math.Max(0,traitPage-1);Rebuild();
-            }).interactable=traitPage>0;
-            Label(rightPane,"СТРАНИЦА "+(traitPage+1)+"/"+pages+"  •  НАЙДЕНО "+eligible.Length,
-                220,579,534,41,16,parchment,TextAnchor.MiddleCenter);
-            Action(rightPane,"Next",772,579,177,41,"ДАЛЬШЕ ▶",()=>{
-                traitPage=Math.Min(pages-1,traitPage+1);Rebuild();
-            }).interactable=traitPage+1<pages;
-            Label(rightPane,runMode
-                ? "Изучение расходует 1 обычное очко особых черт. Перк действует в текущем забеге и сохраняется игрой."
-                : choosePerks
-                    ? "Постоянные перки сохраняются в профиле и возвращаются ГГ при новом забеге."
-                    : "Черт можно выбрать больше трёх: оригинальная карточка отображает только несколько первых.",
-                30,631,914,51,16,muted,TextAnchor.UpperLeft);
+            string counter=filtered.Length==0?"НИЧЕГО НЕ НАЙДЕНО":
+                "НАЙДЕНО "+filtered.Length+"  •  ЛИСТАЙ КОЛЁСИКОМ МЫШИ";
+            int chosen=choosePerks?(runMode?entries.Count(x=>isSelected(x.Id)):
+                (profile.SelectedPerks?.Count??0)):(profile.SelectedTraits?.Count??0);
+            Label(traitResultsHost,counter+"   •   ВЫБРАНО "+chosen,
+                10,listY-25,910,24,15,gold,TextAnchor.MiddleLeft,true);
+
+            if(filtered.Length==0)
+            {
+                Label(traitResultsHost,"Нет подходящих вариантов. Очисти поиск или смени категорию.",
+                    12,listY+21,904,72,17,parchment,TextAnchor.MiddleCenter);
+                return;
+            }
+            // Only 5–7 visible rows exist as Unity objects. Thousands of database
+            // entries can scroll continuously without creating thousands of Buttons.
+            const int columns=4;
+            const float rowHeight=56f, tileHeight=51f, gap=6f, tileWidth=221f;
+            int rows=(filtered.Length+columns-1)/columns;
+            float viewportHeight=choosePerks?278f:203f;
+            int contentHeight=Mathf.CeilToInt(Mathf.Max(viewportHeight+2,rows*rowHeight+5));
+            var content=Scroll(traitResultsHost,4,listY,933,viewportHeight,contentHeight);
+            var scroll=content.parent.GetComponent<ScrollRect>();
+            int previousRow=-1;
+            System.Action renderVisible=()=>{
+                if(content==null||!content) return;
+                int first=Mathf.Max(0,Mathf.FloorToInt(
+                    Mathf.Max(0f,content.anchoredPosition.y)/rowHeight)-1);
+                first=Mathf.Min(first,Mathf.Max(0,rows-1));
+                if(first==previousRow) return;
+                previousRow=first;
+                foreach(Transform item in content.Cast<Transform>().ToArray())
+                    UnityEngine.Object.Destroy(item.gameObject);
+                int last=Mathf.Min(rows,first+7);
+                for(int row=first;row<last;row++)
+                for(int column=0;column<columns;column++)
+                {
+                    int index=row*columns+column;
+                    if(index>=filtered.Length) break;
+                    var entry=filtered[index];
+                    var target=entry;
+                    bool active=isSelected(entry.Id);
+                    float x=7+column*(tileWidth+gap);
+                    float y=5+row*rowHeight;
+                    var button=Action(content,"TraitCard-"+entry.Id,x,y,
+                        tileWidth,tileHeight,"",()=>{
+                        if(runMode)
+                        {
+                            if(GamePerks.PurchaseAnyPerk(mod.CurrentHero,target.Id,log,
+                                out string failure))
+                            {
+                                traitDetails="Изучен перк: "+target.Name;
+                                if(traitDetailLabel) traitDetailLabel.text=traitDetails;
+                                RefreshTraitResults(profile);
+                            }
+                            else
+                            {
+                                traitDetails="Ошибка: "+failure;
+                                if(traitDetailLabel) traitDetailLabel.text=traitDetails;
+                            }
+                            return;
+                        }
+                        var chosenList=choosePerks?profile.SelectedPerks:profile.SelectedTraits;
+                        if(chosenList==null)
+                        {
+                            chosenList=new List<string>();
+                            if(choosePerks) profile.SelectedPerks=chosenList;
+                            else profile.SelectedTraits=chosenList;
+                        }
+                        int maximum=choosePerks?int.MaxValue:
+                            Mathf.Min(12,1+mod.Progression.Rank("legacy.trait"));
+                        if(chosenList.Contains(target.Id)) chosenList.Remove(target.Id);
+                        else if(chosenList.Count<maximum&&!target.Restricted)
+                            chosenList.Add(target.Id);
+                        else
+                        {
+                            traitDetails="Нет свободного слота или черта недоступна для расы.";
+                            if(traitDetailLabel) traitDetailLabel.text=traitDetails;
+                            return;
+                        }
+                        Save();
+                        mod.ApplyCurrentHero();
+                        traitDetails="Обновлено: "+target.Name;
+                        if(traitDetailLabel) traitDetailLabel.text=traitDetails;
+                        RefreshTraitResults(profile);
+                    },active);
+                    button.interactable=runMode
+                        ? !active&&mod.CurrentHero!=null&&GamePerks.AvailablePerkPoints(mod.CurrentHero)>0
+                        : active||(!entry.Restricted &&
+                            (choosePerks||chosen<(1+mod.Progression.Rank("legacy.trait"))));
+                    float left=8f;
+                    if(choosePerks)
+                    {
+                        var sprite=GamePerks.PerkIcon(entry.Id);
+                        if(sprite)
+                        {
+                            var icon=Image(button.transform,"PerkIcon",5,5,40,40,Color.white,sprite);
+                            icon.GetComponent<Image>().preserveAspect=true;
+                            left=49f;
+                        }
+                    }
+                    Label(button.transform,(active?"✓ ":"")+entry.Name,
+                        left,3,tileWidth-left-28,22,15,active?gold:parchment,
+                        TextAnchor.MiddleLeft,true);
+                    string note=runMode?
+                        (active?"ИЗУЧЕН": "1 ОЧКО  •  "+(entry.Category??"")):
+                        choosePerks?(entry.Category??"") + " • РАНГ "+entry.Tier:
+                        entry.Restricted?"НЕДОСТУПНА РАСЕ":entry.Description??"";
+                    if(note.Length>33) note=note.Substring(0,30)+"…";
+                    Label(button.transform,note,left,26,tileWidth-left-27,20,12,muted);
+                    Action(button.transform,"Info",tileWidth-27,13,23,24,"?",()=>{
+                        traitDetails=target.Name+"  •  "+(target.Description??target.Id)+
+                            (target.Restricted?"  •  НЕДОСТУПНА РАСЕ":"");
+                        if(traitDetailLabel) traitDetailLabel.text=traitDetails;
+                    });
+                }
+            };
+            scroll.onValueChanged.AddListener(_=>renderVisible());
+            scroll.verticalNormalizedPosition=1f;
+            renderVisible();
         }
 
         private sealed class TraitEntry
@@ -575,6 +673,7 @@ namespace EternalHero.Plugin
             public bool HasDrawbacks;
             public string Category;
             public int Tier;
+            public string[] Categories;
         }
 
         private void DrawProgression(HeroProfile p, bool special)
