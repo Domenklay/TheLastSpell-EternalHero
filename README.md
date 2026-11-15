@@ -1,25 +1,22 @@
-# The Last Spell — Eternal Hero / Вечный защитник
+# Eternal Hero — Вечный защитник (The Last Spell)
 
-[![CI](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml/badge.svg)](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
+[![Build](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml/badge.svg)](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
 
-## v0.6 — compact UI + first-slot protagonist restoration
+## v0.7 — persistent protagonist, selected traits and career statistics
 
-Compared with v0.5:
+Changes over v0.6:
 
-- The character editor renders at 78% of its previous size, centered in the game with a lighter backdrop.
-- The floating launcher moves **out of the top-right 3-hero portraits**, becoming a small **✦** tab on the **right edge at half-screen height**. F8/F9/Home still work.
-- No automatic menu takeover on launch (new configuration setting `OpenCreatorOnStartupV06=false`).
-- Important gameplay fix: the first character in an **existing loaded save** now receives the permanent protagonist's identity, portrait, chosen race and traits, instead of the previous behavior that only recognized the hero without applying these settings.
-- The CreateStartUnits hook always attempts to apply the protagonist, including profiles without the older `CreationConfirmed` flag.
-- Refresh calls for the original in-game portrait, character model and HUD names are attempted after changing the character.
-- Existing-save stat bonuses are **not re-added**, to avoid doubling them; new upgrade deltas still work where supported.
-- Missed save-load hooks can recover by scanning the roster periodically.
-- Persistent meta XP, 96 upgrades, 6 branches, skill XML and perk slots are unchanged.
+- **Portrait persistence:** the native game's appearance-editor confirmation now captures the *first playable unit* even when the previous CreateStartUnits callback was missed. The saved portrait code's presence is displayed in the creator, and a redundant click on the already selected gender no longer deletes the stored code. Portrait restoration uses CodeGenerator + PortraitAPIManager and refreshes body parts, color palette, snapshot, original game unit portraits and character panel.
+- **Permanent traits:** selected traits are added using AddTrait, including the explicitly chosen override when default randomly generated traits conflict. Selected traits are brought to the front of the native character's list because the native character sheet shows only its normal number of icons.
+- **All perk specializations:** the protagonist can select any existing perk from the game's catalogue without the former 8-perk cap and without restrictions to the initially generated weapon specializations. The mod also attempts to unlock all five native perk tiers for this hero, without changing any other character. Standard perk points are still needed for purchases directly in the original game UI; the mod's specifically selected persistent perks are granted through the existing PerkController.
+- **Career/personal achievements:** existing game's `PlayableUnit.LifetimeStats` counters and weapon/enemy dictionaries are captured into a separate persistent profile and restored to each NEW starting hero. Capturing the highest cumulative values prevents repeated save reloads from duplicating totals. The vanilla `Личные достижения` section should now show carried totals on subsequent runs.
+- **Existing v0.6 meta progression and 96 upgrade nodes** remain unchanged. Automatic career checkpoints every 15 seconds, on quit, after nights, and before switching heroes.
 
-**What this does not do:** spawn a fourth ally. It **replaces the first starting/loaded character** as originally requested, keeping the starting roster at three. It also does not yet guarantee the exact same avatar on every version of the game. Game version-specific tests are required.
+These fixes require testing in the installed game. GitHub CI validates compilation, independent core save/reload, progression tests and XML syntax only. A game update or third-party mod can change the integration behavior.
 
-## Installation and download
+## Downloads
+[GitHub Actions Builds](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml) → latest successful run → artifact EternalHero-v0.7.
 
-[Latest GitHub Actions builds](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml) → successful run → artifact **EternalHero-v0.6**. Extract the internal ZIP into the root of The Last Spell, replacing both DLLs.
+[Russian installation instructions](docs/INSTALL.md) · [Progression](docs/META_PROGRESSION.md)
 
-See [Russian install/test instructions](docs/INSTALL.md), [progression design](docs/META_PROGRESSION.md), and [roadmap](docs/ROADMAP.md). Backup saves first. Mod requires BepInEx 5 x64. TLS.ModKit is required for the custom combat skill definitions.
+No copyrighted game assets are shipped with the mod.
