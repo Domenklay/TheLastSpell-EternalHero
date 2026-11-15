@@ -132,10 +132,13 @@ namespace EternalHero.Plugin
             if (Instance != null) Instance.StartCoroutine(Instance.ConfigureStartingHero());
         }
 
-        private static void AfterPerkPurchase()
+        private static void AfterPerkPurchase(object __instance)
         {
-            if (Instance != null && Instance.currentHero != null)
-                GamePerks.UnlockAllTiers(Instance.currentHero, Instance.Profile, Instance.Logger);
+            if (Instance == null || Instance.currentHero == null) return;
+            var tree = GameBridge.Get(__instance, "UnitPerkTree");
+            var owner = GameBridge.Get(tree, "PlayableUnit");
+            if (ReferenceEquals(owner, Instance.currentHero))
+                GamePerks.UnlockAllTiers(owner, Instance.Profile, Instance.Logger);
         }
 
         private static void AfterRosterLoad()
