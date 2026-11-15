@@ -227,7 +227,7 @@ namespace EternalHero.Plugin
             wrect.anchoredPosition = Vector2.zero;
             // Keep the existing carefully-aligned child controls, but render the whole
             // editor at ~80% scale. Unity CanvasScaler handles other display resolutions.
-            win.transform.localScale = Vector3.one * .78f;
+            win.transform.localScale = Vector3.one * mod.MenuScale;
             FindGamePanel();
             if (gamePanel)
             {

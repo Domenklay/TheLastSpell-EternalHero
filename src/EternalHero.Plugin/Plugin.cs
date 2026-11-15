@@ -24,6 +24,7 @@ namespace EternalHero.Plugin
         private ConfigEntry<bool> applyBonuses;
         private ConfigEntry<bool> debugRewards;
         private ConfigEntry<bool> openOnStartup;
+        private ConfigEntry<float> editorScale;
         private object currentHero;
         private string rosterStatus = "Герой не обнаружен; начни новый забег";
         private float nextRosterProbeTime;
@@ -34,6 +35,7 @@ namespace EternalHero.Plugin
         internal object CurrentHero => currentHero;
         internal string RosterStatus => rosterStatus;
         internal bool EnableDebugRewards => debugRewards != null && debugRewards.Value;
+        internal float MenuScale => Mathf.Clamp(editorScale?.Value ?? .78f, .58f, 1f);
 
         private void Awake()
         {
@@ -46,6 +48,8 @@ namespace EternalHero.Plugin
                     "Automatically apply purchased stat upgrades to the protagonist on a NEW run.");
                 openOnStartup = Config.Bind("Interface", "OpenCreatorOnStartupV06", false,
                     "Open the native Unity character creator on game startup.");
+                editorScale = Config.Bind("Interface", "MenuScale", .78f,
+                    "Scale of the character creator window. Allowed range: 0.58 to 1.00.");
                 store = new ProfileStore(Path.Combine(Paths.ConfigPath, "EternalHero", "profile.json"));
                 progression = new ProgressionService(store.Load());
                 runRewards = new RunRewards(progression);
