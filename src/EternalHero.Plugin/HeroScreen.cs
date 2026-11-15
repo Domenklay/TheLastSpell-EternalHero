@@ -522,7 +522,19 @@ namespace EternalHero.Plugin
                     ? !chosen && mod.CurrentHero!=null &&
                         GamePerks.AvailablePerkPoints(mod.CurrentHero)>0
                     : chosen || (!entry.Restricted && max>0);
-                Label(tile.transform,(chosen?"✓ ":"")+entry.Name,7,2,cw-14,24,16,
+                float textLeft=7f;
+                if(choosePerks)
+                {
+                    var sprite=GamePerks.PerkIcon(entry.Id);
+                    if(sprite)
+                    {
+                        var icon=Image(tile.transform,"NativePerkIcon",5,5,42,42,
+                            Color.white,sprite);
+                        icon.GetComponent<Image>().preserveAspect=true;
+                        textLeft=53f;
+                    }
+                }
+                Label(tile.transform,(chosen?"✓ ":"")+entry.Name,textLeft,2,cw-textLeft-7,24,16,
                     chosen?gold:parchment,TextAnchor.MiddleLeft,true);
                 string category = string.IsNullOrEmpty(entry.Category)?"Общие":entry.Category;
                 string preview=runMode
@@ -532,7 +544,7 @@ namespace EternalHero.Plugin
                         ? category+" • УР. "+entry.Tier
                         : entry.Restricted?"Недоступна расе":entry.Description??"";
                 if(preview.Length>36)preview=preview.Substring(0,33)+"...";
-                Label(tile.transform,preview,7,29,cw-14,19,12,muted,TextAnchor.MiddleLeft);
+                Label(tile.transform,preview,textLeft,29,cw-textLeft-7,19,12,muted,TextAnchor.MiddleLeft);
             }
             if(eligible.Length==0)
                 Label(rightPane,"Нет подходящих записей. Измени фильтр или строку поиска.",
