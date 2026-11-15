@@ -29,6 +29,7 @@ namespace EternalHero.Plugin
         private object currentHero;
         private string rosterStatus = "Герой не обнаружен; начни новый забег";
         private float nextRosterProbeTime;
+        private object lastPerkTree;
         private float nextCareerSaveTime;
 
         internal static Plugin Instance { get; private set; }
@@ -73,6 +74,7 @@ namespace EternalHero.Plugin
 
                 harmony = new Harmony(Id);
                 RacialPenaltyGuard.Install(harmony, Logger);
+                GamePerks.Install(harmony, Logger);
                 var start = AccessTools.Method("TheLastStand.Manager.Unit.PlayableUnitManager:CreateStartUnits");
                 if (start != null)
                 {
@@ -357,6 +359,15 @@ namespace EternalHero.Plugin
                     object found = GameBridge.FirstHero();
                     if (found != null && !ReferenceEquals(currentHero, found))
                         StartCoroutine(RecognizeLoadedHero());
+                    else if(currentHero != null && Profile != null)
+                    {
+                        var tree=GameBridge.Get(currentHero,"PerkTree");
+                        if(tree != null && !ReferenceEquals(tree,lastPerkTree))
+                        {
+                            lastPerkTree=tree;
+                            GamePerks.UnlockAllTiers(currentHero,Profile,Logger);
+                        }
+                    }
                 }
                 if (Time.unscaledTime >= nextCareerSaveTime)
                 {
