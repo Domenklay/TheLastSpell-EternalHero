@@ -26,6 +26,7 @@ namespace EternalHero.Plugin
         private ConfigEntry<bool> openOnStartup;
         private object currentHero;
         private string rosterStatus = "Герой не обнаружен; начни новый забег";
+        private float nextRosterProbeTime;
 
         internal static Plugin Instance { get; private set; }
         internal HeroProfile Profile => progression?.Profile;
@@ -291,8 +292,15 @@ namespace EternalHero.Plugin
                 if (Input.GetKeyDown(KeyCode.F8) || Input.GetKeyDown(KeyCode.F9) ||
                     Input.GetKeyDown(KeyCode.Home))
                     screen?.Toggle();
+                // Recovery if scene changes or save loads before the standard roster hook.
+                if (currentHero == null && Time.unscaledTime >= nextRosterProbeTime)
+                {
+                    nextRosterProbeTime = Time.unscaledTime + 5f;
+                    if (GameBridge.FirstHero() != null)
+                        StartCoroutine(RecognizeLoadedHero());
+                }
             }
-            catch (Exception e) { Logger.LogWarning("Creator hotkey: " + e.Message); }
+            catch (Exception e) { Logger.LogWarning("Creator hotkey / roster probe: " + e.Message); }
         }
 
         private void OnDestroy()
