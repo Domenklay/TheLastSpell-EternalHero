@@ -110,6 +110,10 @@ internal static class Program
                 "ascension contributes real health bonus");
             store.Save(recovered.Profile);
             var reloaded = new ProgressionService(store.Load());
+            recovered.Profile.SelectedPerks.Add("SomeVanillaPerk");
+            store.Save(recovered.Profile);
+            Check(store.Load().SelectedPerks.Contains("SomeVanillaPerk"),
+                "permanent perk loadout survives reload");
             Check(reloaded.MainTreeCompleted, "completion survives save reload");
             Check(reloaded.Profile.AscensionRanks["asc.health"] == 1,
                 "ascension survives save reload");

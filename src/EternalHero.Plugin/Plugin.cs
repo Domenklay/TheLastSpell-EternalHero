@@ -14,7 +14,7 @@ namespace EternalHero.Plugin
     public sealed class Plugin : BaseUnityPlugin
     {
         internal const string Id = "domenklay.tls.eternalhero";
-        internal const string Version = "0.4.0";
+        internal const string Version = "0.5.0";
 
         private Harmony harmony;
         private ProfileStore store;
@@ -134,7 +134,10 @@ namespace EternalHero.Plugin
             rosterStatus = "Герой найден в загруженном забеге. Сохранённые характеристики не начисляются повторно.";
             Logger.LogInfo("Eternal Hero: loaded first hero from existing save; skipping stat reapplication.");
             if (Profile != null && Profile.CreationConfirmed)
+            {
                 Logger.LogInfo("Eternal Hero resumed active skills: " + GameSkills.Grant(found, Profile, Logger));
+                Logger.LogInfo("Eternal Hero resumed permanent perks: " + GamePerks.Grant(found, Profile, Logger));
+            }
             screen?.NotifyHero();
         }
 
@@ -234,6 +237,7 @@ namespace EternalHero.Plugin
                 }
                 string skills = GameSkills.Grant(currentHero, Profile, Logger);
                 Logger.LogInfo("Eternal Hero active skills: " + skills);
+                Logger.LogInfo("Eternal Hero permanent perks: " + GamePerks.Grant(currentHero, Profile, Logger));
                 Logger.LogInfo("Eternal Hero stat API: " + HeroRuntime.DiagnosticStatSurface(currentHero));
                 Logger.LogInfo("Eternal Hero ability API: " + GameApiProbe.HeroAbilityMethods(currentHero));
                 Logger.LogInfo("Eternal Hero skill definitions: " + GameApiProbe.SkillDefinitions());

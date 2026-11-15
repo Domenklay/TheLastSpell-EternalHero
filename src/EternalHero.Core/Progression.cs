@@ -18,6 +18,7 @@ namespace EternalHero.Core
         [DataMember] public string PortraitCode { get; set; } = "";
         [DataMember] public bool CreationConfirmed { get; set; }
         [DataMember] public List<string> SelectedTraits { get; set; } = new List<string>();
+        [DataMember] public List<string> SelectedPerks { get; set; } = new List<string>();
         [DataMember] public bool StarterEssenceGranted { get; set; }
         [DataMember] public long LifetimeExperience { get; set; }
         [DataMember] public long EarnedEssence { get; set; }
@@ -85,7 +86,7 @@ namespace EternalHero.Core
                 "tactics.mobility", 2),
             new Upgrade("legacy.trait", "Наследие", "Закалённый ветеран", "Открывает дополнительную существующую черту", 5, 6,
                 requiresGameIntegration: true),
-            new Upgrade("legacy.perk", "Наследие", "Наследник знаний", "Открывает постоянный существующий перк", 3, 7,
+            new Upgrade("legacy.perk", "Наследие", "Наследник знаний", "Открывает постоянный существующий перк", 8, 7,
                 requiresId: "legacy.trait", requiresRank: 1, requiresGameIntegration: true),
             new Upgrade("legacy.mastery", "Наследие", "Универсал", "Усиление эффектов каждого типа оружия", 5, 5,
                 requiresId: "legacy.perk", requiresRank: 1, requiresGameIntegration: true),
@@ -196,6 +197,7 @@ namespace EternalHero.Core
             if (profile.AscensionRanks == null) profile.AscensionRanks = new Dictionary<string, int>();
             if (profile.ClaimedRewardIds == null) profile.ClaimedRewardIds = new HashSet<string>();
             if (profile.SelectedTraits == null) profile.SelectedTraits = new List<string>();
+            if (profile.SelectedPerks == null) profile.SelectedPerks = new List<string>();
             if (profile.Appearance == null) profile.Appearance = new Dictionary<string, string>();
         }
 
