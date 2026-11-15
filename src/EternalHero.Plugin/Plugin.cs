@@ -14,7 +14,7 @@ namespace EternalHero.Plugin
     public sealed class Plugin : BaseUnityPlugin
     {
         internal const string Id = "domenklay.tls.eternalhero";
-        internal const string Version = "0.5.0";
+        internal const string Version = "0.6.0";
 
         private Harmony harmony;
         private ProfileStore store;
@@ -43,7 +43,7 @@ namespace EternalHero.Plugin
                     "Enable the manual debug XP button.");
                 applyBonuses = Config.Bind("Eternal Hero", "ApplyVerifiedStatBonuses", true,
                     "Automatically apply purchased stat upgrades to the protagonist on a NEW run.");
-                openOnStartup = Config.Bind("Interface", "OpenCreatorOnStartup", true,
+                openOnStartup = Config.Bind("Interface", "OpenCreatorOnStartupV06", false,
                     "Open the native Unity character creator on game startup.");
                 store = new ProfileStore(Path.Combine(Paths.ConfigPath, "EternalHero", "profile.json"));
                 progression = new ProgressionService(store.Load());
@@ -108,7 +108,7 @@ namespace EternalHero.Plugin
                 screen = new HeroScreen(this, Logger);
                 screen.Init();
                 if (openOnStartup.Value) screen.Open();
-                Logger.LogInfo("Eternal Hero native creator ready; click upper-right launcher.");
+                Logger.LogInfo("Eternal Hero compact creator ready; F8/F9/Home or small right-center launcher.");
             }
             catch (Exception e) { Logger.LogError("Eternal Hero canvas init error: " + e); }
         }
@@ -131,14 +131,25 @@ namespace EternalHero.Plugin
             var found = GameBridge.FirstHero();
             if (found == null || ReferenceEquals(currentHero, found)) yield break;
             currentHero = found;
-            rosterStatus = "Герой найден в загруженном забеге. Сохранённые характеристики не начисляются повторно.";
-            Logger.LogInfo("Eternal Hero: loaded first hero from existing save; skipping stat reapplication.");
+            // On a loaded save, do not apply old base-stat bonuses twice.
+            // Identity, portrait and selected perks are independent and MUST be synchronized.
             if (progression != null)
                 HeroRuntime.PrimeFromLoadedSave(found, progression.CalculatedStatBonuses());
-            if (Profile != null && Profile.CreationConfirmed)
+            try
             {
-                Logger.LogInfo("Eternal Hero resumed active skills: " + GameSkills.Grant(found, Profile, Logger));
-                Logger.LogInfo("Eternal Hero resumed permanent perks: " + GamePerks.Grant(found, Profile, Logger));
+                if (Profile != null)
+                {
+                    string identity = GameBridge.Apply(found, Profile, Logger);
+                    rosterStatus = "ГГ восстановлен в первом слоте: " + identity;
+                    Logger.LogInfo("Eternal Hero loaded-save identity synchronized: " + identity);
+                    Logger.LogInfo("Eternal Hero resumed active skills: " + GameSkills.Grant(found, Profile, Logger));
+                    Logger.LogInfo("Eternal Hero resumed permanent perks: " + GamePerks.Grant(found, Profile, Logger));
+                }
+            }
+            catch (Exception e)
+            {
+                rosterStatus = "Ошибка восстановления ГГ в сохранении; см. журнал";
+                Logger.LogError("Eternal Hero loaded-save identity failed: " + e);
             }
             screen?.NotifyHero();
         }
@@ -211,7 +222,7 @@ namespace EternalHero.Plugin
             Instance.SaveProfile();
             Instance.Logger.LogInfo("Eternal Hero: native portrait, gender and name saved to profile.");
             Instance.screen?.Open();
-            Instance.screen?.Notify("Облик героя сохранён и будет восстановлен в новых забегах");
+            Instance.screen?.Notify("Облик героя сохранён и будет применён в новых забегах");
         }
 
         internal void SaveProfile()
@@ -225,12 +236,11 @@ namespace EternalHero.Plugin
             if (currentHero == null || Profile == null) return;
             try
             {
-                if (Profile.CreationConfirmed)
-                {
-                    string applied = GameBridge.Apply(currentHero, Profile, Logger);
-                    rosterStatus = applied;
-                    Logger.LogInfo("Eternal Hero applied profile: " + applied);
-                }
+                // Always replace the first starting unit with the saved protagonist.
+                // A missing CreationConfirmed flag from older profiles must not block restoration.
+                string applied = GameBridge.Apply(currentHero, Profile, Logger);
+                rosterStatus = "Главный герой: " + applied;
+                Logger.LogInfo("Eternal Hero applied profile to FIRST roster unit: " + applied);
                 if (applyBonuses.Value)
                 {
                     int n = HeroRuntime.TryApplyBonuses(currentHero,

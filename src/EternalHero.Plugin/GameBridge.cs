@@ -218,7 +218,40 @@ namespace EternalHero.Plugin
                 catch (Exception e) { log.LogWarning("Eternal Hero AddTrait(" + id + "): " + e.GetBaseException().Message); }
             }
             status.Add("черты: " + added);
+            try { RefreshHeroPresentation(hero, log); }
+            catch (Exception e) { log.LogWarning("Hero view refresh: " + e.Message); }
             return string.Join("; ", status.ToArray());
+        }
+
+        // In-game HUD, avatar and canvas do not automatically follow bare model property
+        // setters; request a redraw via the same methods as the native customizer.
+        public static void RefreshHeroPresentation(object hero, ManualLogSource log)
+        {
+            if (hero == null) return;
+            try
+            {
+                object view = Get(hero, "PlayableUnitView");
+                string heroName = Get(hero, "PlayableUnitName")?.ToString();
+                if (view != null)
+                {
+                    if (!string.IsNullOrWhiteSpace(heroName))
+                    {
+                        Set(view, "name", heroName);
+                        Set(Get(view, "UnitHUD"), "name", heroName + " HUD");
+                    }
+                    Call(view, "RefreshBodyParts", true);
+                }
+                // GameView.TopScreenPanel.UnitPortraitsPanel.RefreshPortraits()
+                var top = StaticGet("TheLastStand.View.GameView", "TopScreenPanel");
+                if (top != null) Call(Get(top, "UnitPortraitsPanel"), "RefreshPortraits");
+                var sheet = Singleton("TheLastStand.View.CharacterSheetPanel");
+                if (sheet != null)
+                {
+                    Call(sheet, "RefreshAvatar");
+                    Call(sheet, "RefreshPortrait", hero);
+                }
+            }
+            catch (Exception e) { log.LogWarning("Eternal Hero HUD refresh: " + e.GetBaseException().Message); }
         }
 
         public static bool OpenNativeEditor(object hero, ManualLogSource log)

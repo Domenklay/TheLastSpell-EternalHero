@@ -51,6 +51,7 @@ namespace EternalHero.Plugin
                     GameBridge.Set(hero, "Gender", profile.HeroGender);
                 if (!string.IsNullOrWhiteSpace(profile.HeroFaceId))
                     GameBridge.Set(hero, "FaceId", profile.HeroFaceId);
+                if (result) GameBridge.RefreshHeroPresentation(hero, log);
                 log.LogInfo("Eternal Hero portrait restored from native game code: " + result);
                 return result;
             }

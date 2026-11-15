@@ -206,17 +206,18 @@ namespace EternalHero.Plugin
                     typeof(EventSystem), typeof(StandaloneInputModule));
                 UnityEngine.Object.DontDestroyOnLoad(events);
             }
-            launcher = Image(canvasObject.transform,"OpenEternalHero",0,0,225,46,slate);
+            // Minimal edge tab: no overlap with the three unit portraits in the top-right HUD.
+            launcher = Image(canvasObject.transform,"OpenEternalHero",0,0,50,52,slate);
             var launcherRect = launcher.GetComponent<RectTransform>();
-            launcherRect.anchorMin = launcherRect.anchorMax = new Vector2(1f,1f);
-            launcherRect.pivot = new Vector2(1,1);
-            launcherRect.anchoredPosition = new Vector2(-14,-14);
+            launcherRect.anchorMin = launcherRect.anchorMax = new Vector2(1f,.50f);
+            launcherRect.pivot = new Vector2(1f,.50f);
+            launcherRect.anchoredPosition = new Vector2(-7f,0f);
             launcher.GetComponent<Image>().raycastTarget = true;
             launcher.AddComponent<Button>().onClick.AddListener(Toggle);
-            Label(launcher.transform,"✦  ВЕЧНЫЙ ГЕРОЙ",10,0,205,46,19,gold,TextAnchor.MiddleCenter,true);
+            Label(launcher.transform,"✦",0,0,50,52,26,gold,TextAnchor.MiddleCenter,true);
 
             overlay = Image(canvasObject.transform,"EternalHeroOverlay",0,0,1600,900,
-                new Color(.025f,.024f,.028f,.82f));
+                new Color(.025f,.024f,.028f,.55f));
             Fill(overlay.GetComponent<RectTransform>());
             overlay.GetComponent<Image>().raycastTarget = true;
             var win = Image(overlay.transform,"CharacterCreationWindow",85,46,W,H,ink);
@@ -224,6 +225,9 @@ namespace EternalHero.Plugin
             wrect.anchorMin = wrect.anchorMax = new Vector2(.5f,.5f);
             wrect.pivot = new Vector2(.5f,.5f);
             wrect.anchoredPosition = Vector2.zero;
+            // Keep the existing carefully-aligned child controls, but render the whole
+            // editor at ~80% scale. Unity CanvasScaler handles other display resolutions.
+            win.transform.localScale = Vector3.one * .78f;
             FindGamePanel();
             if (gamePanel)
             {
