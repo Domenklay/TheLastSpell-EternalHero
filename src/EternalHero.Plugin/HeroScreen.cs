@@ -30,6 +30,9 @@ namespace EternalHero.Plugin
         private int tab;
         private int mainBranchChoice;
         private int specialBranchChoice;
+        private bool choosePerks;
+        private int traitPage;
+        private string traitSearch = "";
         private readonly List<Image> tabGraphics = new List<Image>();
         private string status = "";
         private float lastResolve;
@@ -378,50 +381,99 @@ namespace EternalHero.Plugin
 
         private void DrawTraits(HeroProfile p)
         {
-            int ranks=mod.Progression.Rank("legacy.trait");
-            int slots=Math.Min(4,1+ranks);
-            FrameHeader("ПОСТОЯННЫЕ ЧЕРТЫ","Выбранные черты автоматически добавляются главному герою при новом забеге.");
-            Label(rightPane,"СЛОТЫ ЧЕРТ: "+(p.SelectedTraits?.Count??0)+" / "+slots,
-                30,108,600,38,20,gold,TextAnchor.MiddleLeft,true);
-            var list=GameBridge.Traits();
-            if(list.Count==0)
+            int traitSlots = Math.Min(6, 1 + mod.Progression.Rank("legacy.trait"));
+            int perkSlots = Math.Min(8, mod.Progression.Rank("legacy.perk"));
+            FrameHeader("ЧЕРТЫ И ПОСТОЯННЫЕ ПЕРКИ",
+                "Сохраняются между забегами. Применяются только к Вечному защитнику.");
+            Action(rightPane,"TraitSub",31,113,458,44,
+                "ЧЕРТЫ   •   "+(p.SelectedTraits?.Count??0)+"/"+traitSlots,()=>{
+                    choosePerks=false;traitPage=0;traitSearch="";Rebuild();
+                },!choosePerks);
+            Action(rightPane,"PerkSub",495,113,458,44,
+                "ПЕРКИ   •   "+(p.SelectedPerks?.Count??0)+"/"+perkSlots,()=>{
+                    choosePerks=true;traitPage=0;traitSearch="";Rebuild();
+                },choosePerks);
+            int max=choosePerks?perkSlots:traitSlots;
+            Label(rightPane,choosePerks ?
+                "ДОСТУПНЫХ СЛОТОВ ПЕРКОВ: "+perkSlots+" (Наследник знаний)" :
+                "ДОСТУПНЫХ СЛОТОВ ЧЕРТ: "+traitSlots+" (Закалённый ветеран)",
+                32,168,906,38,18,gold,TextAnchor.MiddleLeft,true);
+            Field(rightPane,32,211,920,42,traitSearch,"Поиск по названию или ID",v=>{
+                traitSearch=(v??"").Trim();traitPage=0;Rebuild();
+            },60);
+
+            var traits=choosePerks?null:GameBridge.Traits();
+            var perks=choosePerks?GamePerks.Available():null;
+            var eligible = choosePerks ?
+                perks.Where(x=>x.Name.IndexOf(traitSearch,StringComparison.OrdinalIgnoreCase)>=0 ||
+                    x.Id.IndexOf(traitSearch,StringComparison.OrdinalIgnoreCase)>=0)
+                    .Select(x=>new TraitEntry {Id=x.Id,Name=x.Name,Description=x.Id}).ToArray():
+                traits.Where(x=>x.Name.IndexOf(traitSearch,StringComparison.OrdinalIgnoreCase)>=0 ||
+                    x.Id.IndexOf(traitSearch,StringComparison.OrdinalIgnoreCase)>=0)
+                    .Select(x=>new TraitEntry {Id=x.Id,Name=x.Name,Description=x.Description,
+                         Restricted=x.ForbiddenRaces.Contains(p.HeroRaceId)}).ToArray();
+
+            if(eligible.Length==0)
             {
-                Label(rightPane,"Игровая база черт ещё не загружена.\nПопробуй открыть экран после загрузки забега.",
-                    34,183,900,100,20,parchment);
+                Label(rightPane,"Список пуст. Игровая база перков/черт станет доступна после загрузки игры.",
+                    43,291,888,100,20,parchment,TextAnchor.UpperCenter);
                 return;
             }
-            Label(rightPane,"Доступные черты из игры: "+list.Count+
-                ". Несовместимые с расой автоматически пропускаются.",30,144,900,34,16,muted);
-            var scroll=Scroll(rightPane,25,189,943,389,list.Count*74+16);
-            int i=0;
-            foreach(var trait in list)
+            const int perPage=12;
+            int pages=Math.Max(1,(eligible.Length+perPage-1)/perPage);
+            traitPage=Mathf.Clamp(traitPage,0,pages-1);
+            var visible=eligible.Skip(traitPage*perPage).Take(perPage).ToArray();
+            var list=Scroll(rightPane,25,274,944,291,visible.Length*77+14);
+            int ix=0;
+            foreach(var entry in visible)
             {
-                bool chosen=p.SelectedTraits!=null && p.SelectedTraits.Contains(trait.Id);
-                bool forbidden=trait.ForbiddenRaces.Contains(p.HeroRaceId);
-                int y=9+i*74;i++;
-                Image(scroll,"TraitCard",10,y,901,65,card);
-                Label(scroll,trait.Name,25,y+5,620,27,19,chosen?gold:parchment,TextAnchor.MiddleLeft,true);
-                Label(scroll,(!string.IsNullOrEmpty(trait.Description) ? trait.Description + "   •   " : "") +
-                    "Цена: "+trait.Cost+
-                    (forbidden?"  •  НЕСОВМЕСТИМА С РАСОЙ":""),25,y+34,670,24,14,muted);
-                var chosenTrait=trait;
-                var b=Action(scroll,"Trait-"+trait.Id,700,y+10,197,44,
+                int y=9+ix++*77;
+                bool chosen=choosePerks?
+                    p.SelectedPerks!=null && p.SelectedPerks.Contains(entry.Id):
+                    p.SelectedTraits!=null && p.SelectedTraits.Contains(entry.Id);
+                Image(list,"Selectable-"+entry.Id,9,y,905,70,card);
+                Label(list,entry.Name,24,y+5,659,28,18,chosen?gold:parchment,TextAnchor.MiddleLeft,true);
+                Label(list,entry.Restricted?"НЕДОСТУПНО ДЛЯ ЭТОЙ РАСЫ":
+                    entry.Description,24,y+34,660,29,14,muted);
+                var captured=entry;
+                var btn=Action(list,"Toggle-"+entry.Id,708,y+11,192,46,
                     chosen?"УБРАТЬ":"ВЫБРАТЬ",()=>{
-                        if(p.SelectedTraits==null)p.SelectedTraits=new List<string>();
-                        if(p.SelectedTraits.Contains(chosenTrait.Id))
-                            p.SelectedTraits.Remove(chosenTrait.Id);
-                        else if(p.SelectedTraits.Count<slots && !chosenTrait.ForbiddenRaces.Contains(p.HeroRaceId))
-                            p.SelectedTraits.Add(chosenTrait.Id);
-                        else { status="Нет свободных слотов или черта несовместима"; }
-                        Save();mod.ApplyCurrentHero();Rebuild();
+                        var selected=choosePerks?p.SelectedPerks:p.SelectedTraits;
+                        if(selected==null)
+                        {
+                            selected=new List<string>();
+                            if(choosePerks)p.SelectedPerks=selected;
+                            else p.SelectedTraits=selected;
+                        }
+                        if(selected.Contains(captured.Id))selected.Remove(captured.Id);
+                        else if(selected.Count<max && !captured.Restricted)selected.Add(captured.Id);
+                        else { status="Нет свободного слота или неподходящая раса"; }
+                        Save();
+                        mod.ApplyCurrentHero();
+                        Rebuild();
                     },chosen);
-                b.interactable=!forbidden;
+                btn.interactable=chosen||(!entry.Restricted&&max>0);
             }
-            Label(rightPane,"Свободный слот черты доступен с самого начала. Покупка улучшения «Закалённый ветеран» добавит слоты.",
-                27,585,940,60,16,muted);
-            Action(rightPane,"ApplyTraits",650,649,297,51,"ПРИМЕНИТЬ ЧЕРТЫ",()=>{
-                Save();mod.ApplyCurrentHero();Notify("Выбранные черты сохранены");
-            },true);
+            Action(rightPane,"PrevTraits",38,579,174,43,"◀ НАЗАД",()=>{
+                traitPage=Math.Max(0,traitPage-1);Rebuild();
+            }).interactable=traitPage>0;
+            Label(rightPane,"СТРАНИЦА "+(traitPage+1)+" / "+pages+"   •   НАЙДЕНО "+eligible.Length,
+                239,579,493,45,16,parchment,TextAnchor.MiddleCenter);
+            Action(rightPane,"NextTraits",773,579,174,43,"ДАЛЬШЕ ▶",()=>{
+                traitPage=Math.Min(pages-1,traitPage+1);Rebuild();
+            }).interactable=traitPage+1<pages;
+            Label(rightPane,choosePerks ?
+                "Постоянные перки используют оригинальный PerkController. Некоторые особые игровые перки могут быть несовместимы между собой.":
+                "Черты добавляются штатным AddTrait. Несовместимые черты игра может отклонить.",
+                34,632,910,64,16,muted,TextAnchor.UpperLeft);
+        }
+
+        private sealed class TraitEntry
+        {
+            public string Id;
+            public string Name;
+            public string Description;
+            public bool Restricted;
         }
 
         private void DrawProgression(HeroProfile p, bool special)
