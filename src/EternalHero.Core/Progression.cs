@@ -90,7 +90,7 @@ namespace EternalHero.Core
             new Upgrade("tactics.range", "Тактический гений", "Дальний взгляд", "+1 к дальности за ранг", 2, 5, "SkillRange", 1),
             new Upgrade("tactics.action", "Тактический гений", "Дополнительное действие", "+1 очко действий за ранг", 2, 10, "ActionPoints", 1,
                 "tactics.mobility", 2),
-            new Upgrade("legacy.trait", "Наследие", "Закалённый ветеран", "Открывает дополнительную существующую черту", 5, 6,
+            new Upgrade("legacy.trait", "Наследие", "Закалённый ветеран", "Открывает дополнительную существующую черту", 11, 6,
                 requiresGameIntegration: true),
             new Upgrade("legacy.perk", "Наследие", "Наследник знаний", "Открывает постоянный существующий перк", 8, 7,
                 requiresId: "legacy.trait", requiresRank: 1, requiresGameIntegration: true),

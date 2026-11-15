@@ -98,6 +98,7 @@ namespace EternalHero.Plugin
             public string Id;
             public string Name;
             public int Cost;
+            public bool HasDrawbacks;
             public string Description = "";
             public List<string> ForbiddenRaces = new List<string>();
         }
@@ -125,6 +126,11 @@ namespace EternalHero.Plugin
                 var trait = new TraitOption { Id = id,
                     Name = string.IsNullOrWhiteSpace(localizedName) ? id : localizedName };
                 try { trait.Cost = Convert.ToInt32(Get(e.Value, "Cost") ?? 0); } catch { }
+                trait.HasDrawbacks = trait.Cost < 0;
+                // The filter is based on actual adverse stat/slot changes, not the trait name.
+                var removedSlots = Get(e.Value, "RemoveSlots") as IEnumerable;
+                if (removedSlots != null)
+                    foreach (object removed in removedSlots) { if (removed != null) trait.HasDrawbacks = true; }
                 var modifiers = Get(e.Value, "StatModifiers") as IEnumerable;
                 if (modifiers != null)
                 {
@@ -134,7 +140,11 @@ namespace EternalHero.Plugin
                         var stat = Get(modifier, "Stat")?.ToString();
                         var value = Get(modifier, "Value");
                         if (stat != null && value != null)
+                        {
                             statDescriptions.Add(stat + " " + value);
+                            try { if (Convert.ToSingle(value) < 0f) trait.HasDrawbacks = true; }
+                            catch { }
+                        }
                     }
                     trait.Description = string.Join(", ", statDescriptions.Take(3).ToArray());
                 }
@@ -199,7 +209,7 @@ namespace EternalHero.Plugin
             }
 
             var existing = Get(hero, "UnitTraitDefinitions") as IEnumerable;
-            int max = Math.Min(6, 1 + (profile.Ranks != null &&
+            int max = Math.Min(12, 1 + (profile.Ranks != null &&
                 profile.Ranks.TryGetValue("legacy.trait", out int ranks) ? ranks : 0));
             int added = 0;
             foreach (var id in (profile.SelectedTraits ?? new List<string>()).Distinct().Take(max))

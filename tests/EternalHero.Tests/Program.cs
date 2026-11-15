@@ -81,6 +81,8 @@ internal static class Program
             Check(recovered.Profile.StarterEssenceGranted, "free starter essence flag persists");
             Check(recovered.Profile.SelectedTraits.Contains("Test-Existing-Trait"), "trait loadout survives reload");
 
+            Check(UpgradeCatalog.Find("legacy.trait").MaxRank == 11,
+                "up to twelve independent selected permanent traits are supported");
             Check(UpgradeCatalog.All.Count == 96, "all 96 upgrades registered");
             Check(UpgradeCatalog.Branches.Count == 6, "six specialization branches");
             Check(UpgradeCatalog.All.Select(u => u.Id).Distinct().Count() == 96, "upgrade IDs unique");
