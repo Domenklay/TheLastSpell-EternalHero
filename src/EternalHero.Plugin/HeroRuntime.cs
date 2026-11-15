@@ -154,6 +154,15 @@ namespace EternalHero.Plugin
             }
         }
 
+        // Vanilla save already includes the stat changes made in a previous session.
+        // Prime delta tracking when resuming it: a subsequent new purchase applies ONLY its delta.
+        internal static void PrimeFromLoadedSave(object hero, IReadOnlyDictionary<string, float> previous)
+        {
+            if (hero == null || previous == null) return;
+            if (Patched.TryGetValue(hero, out _)) return;
+            Patched.Add(hero, new Dictionary<string, float>(previous));
+        }
+
         // Conservative bridge. Refuses unknown stat API signatures and changes only named stats.
         // Per-hero delta tracking protects against double applying in the same runtime instance.
         internal static int TryApplyBonuses(object hero, IReadOnlyDictionary<string, float> bonuses, ManualLogSource log)
