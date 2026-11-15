@@ -30,7 +30,8 @@ jobs:
               inner=root.find('./Definition/SkillDefinition')
               assert inner is not None and inner.attrib['Id']==root.attrib['id']
               ids.add(inner.attrib['Id'])
-          assert ids=={'EternalGhostShot','EternalEtherSlash','EternalArcanePulse'}, ids
+          assert ids=={'EternalGhostShot','EternalEtherSlash','EternalArcanePulse',
+                        'EternalEchoHunter','EternalEchoMage','EternalSecondShot'}, ids
           print('All special skill XML patches are valid')
           PY
       - name: Package prototype DLLs

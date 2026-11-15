@@ -13,7 +13,10 @@ namespace EternalHero.Plugin
         private static readonly Dictionary<string,string> Ids = new Dictionary<string,string> {
             { "forbidden.ghostshot", "EternalGhostShot" },
             { "forbidden.etherslash", "EternalEtherSlash" },
-            { "forbidden.arcaneburst", "EternalArcanePulse" }
+            { "forbidden.arcaneburst", "EternalArcanePulse" },
+            { "forbidden.secondshot", "EternalSecondShot" },
+            { "trinity.hunter", "EternalEchoHunter" },
+            { "trinity.mage", "EternalEchoMage" }
         };
 
         public static string Grant(object hero, HeroProfile profile, ManualLogSource log)

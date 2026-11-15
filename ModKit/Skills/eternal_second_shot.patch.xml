@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Patch target="SkillDefinition" action="add" id="EternalSecondShot">
+  <Definition>
+    <SkillDefinition Id="EternalSecondShot">
+      <OverrideArtId>Slice</OverrideArtId>
+      <ActionPointsCost>0</ActionPointsCost>
+      <ManaCost>0</ManaCost>
+      <UsesPerTurnCount>1</UsesPerTurnCount>
+      <Range Min="3" Max="7" Modifiable="true"/>
+      <AreaOfEffect OriginX="0" OriginY="0">X</AreaOfEffect>
+      <SkillAction>
+        <Attack>
+          <AttackType>Ranged</AttackType>
+          <DamageMultiplier>1.05</DamageMultiplier>
+          <SkillEffects><NoDodge/></SkillEffects>
+        </Attack>
+      </SkillAction>
+      <CastFXs TotalDuration="0.65">
+        <SoundEffect>
+          <Path>ShortSword/Slice/SFX_Skill_Sword_Slice</Path>
+          <Delay>0.05</Delay>
+        </SoundEffect>
+        <VisualEffect>
+          <Paths>
+            <Path Orientation="NSEW">DruidicStaff/Lightning Strike/LightningStrike_ThunderNSEW</Path>
+          </Paths>
+          <Target>HitTiles</Target>
+          <SortingDepth>Before</SortingDepth>
+          <Delay>0.45</Delay>
+        </VisualEffect>
+      </CastFXs>
+    </SkillDefinition>
+  </Definition>
+</Patch>
