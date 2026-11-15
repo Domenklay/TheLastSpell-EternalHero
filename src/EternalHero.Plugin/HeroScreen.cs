@@ -357,14 +357,17 @@ namespace EternalHero.Plugin
             });
             Label(rightPane,"ОБЛИК",35,368,300,36,18,gold,TextAnchor.MiddleLeft,true);
             Action(rightPane,"Male",35,414,249,54,"МУЖЧИНА",()=>{
-                p.HeroGender="Male"; p.PortraitCode="";Save();Rebuild();},p.HeroGender=="Male");
+                if(p.HeroGender!="Male") {p.HeroGender="Male";p.PortraitCode="";}
+                Save();Rebuild();},p.HeroGender=="Male");
             Action(rightPane,"Female",292,414,249,54,"ЖЕНЩИНА",()=>{
-                p.HeroGender="Female"; p.PortraitCode="";Save();Rebuild();},p.HeroGender=="Female");
+                if(p.HeroGender!="Female") {p.HeroGender="Female";p.PortraitCode="";}
+                Save();Rebuild();},p.HeroGender=="Female");
             Label(rightPane,"КОД ПОРТРЕТА (ИЗ РЕДАКТОРА ИГРЫ)",584,123,380,35,18,gold,TextAnchor.MiddleLeft,true);
             Field(rightPane,584,165,376,49,p.PortraitCode,"Код портрета, необязательно",v=>{
                 p.PortraitCode=v.Trim();Save();
             },128);
-            Label(rightPane,"Портрет создаётся средствами оригинальной игры.\nПосле начала забега нажми слева «Редактор внешности»,\nвыбери лицо, волосы, цвета и рисунок.\nНастройки будут сохранены для следующего забега.",
+            Label(rightPane,"Портрет: "+(string.IsNullOrWhiteSpace(p.PortraitCode)?"НЕ СОХРАНЁН":"СОХРАНЁН")+
+                "\nНажми слева «Редактор внешности» в забеге, выбери облик и подтверди.\nИгра сохранит код рисунка для следующих забегов.",
                 583,234,380,156,18,parchment,TextAnchor.UpperLeft);
             Image(rightPane,"Notice",35,505,926,2,gold);
             Label(rightPane,"ПЕРВОЕ СОЗДАНИЕ",38,527,400,34,20,gold,TextAnchor.MiddleLeft,true);
