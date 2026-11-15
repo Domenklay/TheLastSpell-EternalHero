@@ -28,6 +28,7 @@ namespace EternalHero.Plugin
         private object currentHero;
         private string rosterStatus = "Герой не обнаружен; начни новый забег";
         private float nextRosterProbeTime;
+        private float nextCareerSaveTime;
 
         internal static Plugin Instance { get; private set; }
         internal HeroProfile Profile => progression?.Profile;
@@ -101,6 +102,13 @@ namespace EternalHero.Plugin
                         AccessTools.Method(typeof(Plugin), nameof(AfterNativeAppearanceSaved))));
                     Logger.LogInfo("Eternal Hero native appearance save hook installed.");
                 }
+                var buyPerk = AccessTools.Method("TheLastStand.Controller.Unit.Perk.UnitPerkTreeController:BuyPerk");
+                if (buyPerk != null)
+                {
+                    harmony.Patch(buyPerk, postfix: new HarmonyMethod(
+                        AccessTools.Method(typeof(Plugin), nameof(AfterPerkPurchase))));
+                    Logger.LogInfo("Eternal Hero vanilla perk tier unlock hook installed.");
+                }
                 Logger.LogInfo("Eternal Hero v" + Version + " initialized (Unity Canvas).");
             }
             catch (Exception e) { Logger.LogError("Eternal Hero boot error: " + e); }
@@ -124,6 +132,12 @@ namespace EternalHero.Plugin
             if (Instance != null) Instance.StartCoroutine(Instance.ConfigureStartingHero());
         }
 
+        private static void AfterPerkPurchase()
+        {
+            if (Instance != null && Instance.currentHero != null)
+                GamePerks.UnlockAllTiers(Instance.currentHero, Instance.Profile, Instance.Logger);
+        }
+
         private static void AfterRosterLoad()
         {
             if (Instance != null) Instance.StartCoroutine(Instance.RecognizeLoadedHero());
@@ -135,7 +149,10 @@ namespace EternalHero.Plugin
             yield return null;
             var found = GameBridge.FirstHero();
             if (found == null || ReferenceEquals(currentHero, found)) yield break;
+            if (currentHero != null && !ReferenceEquals(currentHero, found))
+                SnapshotCurrentCareer();
             currentHero = found;
+            SnapshotCurrentCareer();
             // On a loaded save, do not apply old base-stat bonuses twice.
             // Identity, portrait and selected perks are independent and MUST be synchronized.
             if (progression != null)
@@ -163,7 +180,11 @@ namespace EternalHero.Plugin
         {
             yield return null;
             yield return null;
-            currentHero = GameBridge.FirstHero();
+            var previousHero = currentHero;
+            var firstUnit = GameBridge.FirstHero();
+            if (previousHero != null && !ReferenceEquals(previousHero, firstUnit))
+                SnapshotCurrentCareer();
+            currentHero = firstUnit;
             if (currentHero == null)
             {
                 rosterStatus = "Стартовая команда создана, но список героев не найден";
@@ -180,6 +201,8 @@ namespace EternalHero.Plugin
                 Logger.LogInfo("Eternal Hero: created persistent run " + newRunId);
                 SaveProfile();
             }
+            // The new run inherits all recorded personal achievements from the career profile.
+            GameCareerHistory.ApplyToFreshHero(currentHero, Profile, Logger);
             ApplyCurrentHero();
             screen?.NotifyHero();
         }
@@ -209,6 +232,7 @@ namespace EternalHero.Plugin
                 if (runRewards.NightSurvived(nextNight))
                 {
                     Profile.ClaimedRewardIds.Add(token);
+                    SnapshotCurrentCareer();
                     SaveProfile();
                     Logger.LogInfo("Eternal Hero: rewarded survived night " + nextNight +
                         ", game day " + day + "; total essence=" + Profile.AvailableEssence);
@@ -239,6 +263,17 @@ namespace EternalHero.Plugin
                 Instance.Profile.HeroFaceId + ", gender=" + Instance.Profile.HeroGender);
             Instance.screen?.Open();
             Instance.screen?.Notify("Облик героя сохранён и будет применён в новых забегах");
+        }
+
+        private void SnapshotCurrentCareer()
+        {
+            try
+            {
+                if (currentHero != null && Profile != null &&
+                    GameCareerHistory.Capture(currentHero, Profile))
+                    SaveProfile();
+            }
+            catch (Exception e) { Logger.LogWarning("Eternal Hero personal statistics snapshot: " + e.Message); }
         }
 
         internal void SaveProfile()
@@ -308,18 +343,30 @@ namespace EternalHero.Plugin
                     Input.GetKeyDown(KeyCode.Home))
                     screen?.Toggle();
                 // Recovery if scene changes or save loads before the standard roster hook.
-                if (currentHero == null && Time.unscaledTime >= nextRosterProbeTime)
+                if (Time.unscaledTime >= nextRosterProbeTime)
                 {
                     nextRosterProbeTime = Time.unscaledTime + 5f;
-                    if (GameBridge.FirstHero() != null)
+                    object found = GameBridge.FirstHero();
+                    if (found != null && !ReferenceEquals(currentHero, found))
                         StartCoroutine(RecognizeLoadedHero());
+                }
+                if (Time.unscaledTime >= nextCareerSaveTime)
+                {
+                    nextCareerSaveTime = Time.unscaledTime + 15f;
+                    SnapshotCurrentCareer();
                 }
             }
             catch (Exception e) { Logger.LogWarning("Creator hotkey / roster probe: " + e.Message); }
         }
 
+        private void OnApplicationQuit()
+        {
+            SnapshotCurrentCareer();
+        }
+
         private void OnDestroy()
         {
+            SnapshotCurrentCareer();
             if (harmony != null) harmony.UnpatchSelf();
             if (Instance == this) Instance = null;
         }
