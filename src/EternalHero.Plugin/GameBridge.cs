@@ -228,7 +228,26 @@ namespace EternalHero.Plugin
                 }
                 catch (Exception e) { log.LogWarning("Eternal Hero AddTrait(" + id + "): " + e.GetBaseException().Message); }
             }
-            status.Add("черты: " + added);
+            // The vanilla character sheet renders only its limited number of trait icons.
+            // Keep explicitly selected permanent traits FIRST, without changing their
+            // already-applied stat modifiers or duplicating the underlying definitions.
+            var traitList = Get(hero, "UnitTraitDefinitions") as IList;
+            if (traitList != null && profile.SelectedTraits != null)
+            {
+                var chosen = profile.SelectedTraits.Distinct().Take(max).ToList();
+                for (int k = chosen.Count - 1; k >= 0; --k)
+                {
+                    object match = null;
+                    foreach (object item in traitList)
+                        if (Get(item, "Id")?.ToString() == chosen[k]) { match = item; break; }
+                    if (match != null)
+                    {
+                        traitList.Remove(match);
+                        traitList.Insert(0, match);
+                    }
+                }
+            }
+            status.Add("черты: " + added + " (выбранные показаны первыми)");
             try { RefreshHeroPresentation(hero, log); }
             catch (Exception e) { log.LogWarning("Hero view refresh: " + e.Message); }
             return string.Join("; ", status.ToArray());
