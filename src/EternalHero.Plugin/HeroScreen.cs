@@ -34,6 +34,7 @@ namespace EternalHero.Plugin
         private bool perkRunMode;
         private int traitFilter;
         private int traitCategory;
+        private float traitScrollPosition = 1f;
         private string traitSearch = "";
         private RectTransform traitResultsHost;
         private Text traitDetailLabel;
@@ -404,24 +405,24 @@ namespace EternalHero.Plugin
             Action(rightPane,"TraitSub",30,107,460,40,
                 "ЧЕРТЫ  •  "+(p.SelectedTraits?.Count??0)+"/"+slots,()=>{
                     choosePerks=false;perkRunMode=false;traitFilter=0;
-                    traitCategory=0;traitSearch="";traitDetails="";
+                    traitCategory=0;traitScrollPosition=1f;traitSearch="";traitDetails="";
                     Rebuild();
                 },!choosePerks);
             Action(rightPane,"PerkSub",495,107,460,40,
                 "ПЕРКИ  •  "+(p.SelectedPerks?.Count??0)+" ПОСТ.",()=>{
                     choosePerks=true;perkRunMode=false;traitFilter=0;
-                    traitCategory=0;traitSearch="";traitDetails="";
+                    traitCategory=0;traitScrollPosition=1f;traitSearch="";traitDetails="";
                     Rebuild();
                 },choosePerks);
 
             if(choosePerks)
             {
                 Action(rightPane,"PermanentPerks",30,150,456,32,"ПОСТОЯННЫЕ",()=>{
-                    perkRunMode=false;traitFilter=0;traitSearch="";Rebuild();
+                    perkRunMode=false;traitFilter=0;traitScrollPosition=1f;traitSearch="";Rebuild();
                 },!perkRunMode);
                 Action(rightPane,"RunPerks",492,150,463,32,
                     "В ЗАБЕГЕ  •  ОЧКОВ "+GamePerks.AvailablePerkPoints(mod.CurrentHero),()=>{
-                        perkRunMode=true;traitFilter=0;traitSearch="";Rebuild();
+                        perkRunMode=true;traitFilter=0;traitScrollPosition=1f;traitSearch="";Rebuild();
                     },perkRunMode);
             }
             else
@@ -433,11 +434,12 @@ namespace EternalHero.Plugin
                 "Начни вводить название или эффект — список обновится сразу",null,80);
             input.onValueChanged.AddListener(value=>{
                 traitSearch=value??"";
+                traitScrollPosition=1f;
                 RefreshTraitResults(p);
             });
             Action(rightPane,"ClearSearch",843,187,111,40,"ОЧИСТИТЬ",()=>{
                 if(input.text.Length>0) input.text="";
-                else {traitSearch="";RefreshTraitResults(p);}
+                else {traitSearch="";traitScrollPosition=1f;RefreshTraitResults(p);}
                 input.ActivateInputField();
             });
             var host=Image(rightPane,"TraitResults",26,232,941,337,slate);
@@ -504,8 +506,9 @@ namespace EternalHero.Plugin
             }
             else if(traitFilter>0) query=query.Where(x=>isSelected(x.Id));
 
-            var filtered=query.OrderByDescending(x=>isSelected(x.Id))
-                .ThenBy(x=>choosePerks?x.Category:x.Name)
+            // Never reorder the list after selecting an item: preserve the scroll
+            // context so multiple adjacent traits can be chosen without losing place.
+            var filtered=query.OrderBy(x=>choosePerks?x.Category:x.Name)
                 .ThenBy(x=>choosePerks?x.Tier:0)
                 .ThenBy(x=>x.Name).ToArray();
 
@@ -519,6 +522,7 @@ namespace EternalHero.Plugin
                 Action(traitResultsHost,"TraitFilter"+i,8+i*(filterWidth+6),4,
                     filterWidth,33,filters[i],()=>{
                         traitFilter=selectedFilter;
+                        traitScrollPosition=1f;
                         RefreshTraitResults(profile);
                     },traitFilter==i);
             }
@@ -538,6 +542,7 @@ namespace EternalHero.Plugin
                     Action(traitResultsHost,"TraitCategory"+i,8+col*232,42+row*36,
                         chipW,30,cat+"  "+count,()=>{
                             traitCategory=selectedCategory;
+                            traitScrollPosition=1f;
                             RefreshTraitResults(profile);
                         },traitCategory==i);
                 }
@@ -595,6 +600,7 @@ namespace EternalHero.Plugin
                             {
                                 traitDetails="Изучен перк: "+target.Name;
                                 if(traitDetailLabel) traitDetailLabel.text=traitDetails;
+                                traitScrollPosition=scroll.verticalNormalizedPosition;
                                 RefreshTraitResults(profile);
                             }
                             else
@@ -626,6 +632,7 @@ namespace EternalHero.Plugin
                         mod.ApplyCurrentHero();
                         traitDetails="Обновлено: "+target.Name;
                         if(traitDetailLabel) traitDetailLabel.text=traitDetails;
+                        traitScrollPosition=scroll.verticalNormalizedPosition;
                         RefreshTraitResults(profile);
                     },active);
                     button.interactable=runMode
@@ -659,8 +666,11 @@ namespace EternalHero.Plugin
                     });
                 }
             };
-            scroll.onValueChanged.AddListener(_=>renderVisible());
-            scroll.verticalNormalizedPosition=1f;
+            scroll.onValueChanged.AddListener(_=>{
+                traitScrollPosition=scroll.verticalNormalizedPosition;
+                renderVisible();
+            });
+            scroll.verticalNormalizedPosition=Mathf.Clamp01(traitScrollPosition);
             renderVisible();
         }
 
