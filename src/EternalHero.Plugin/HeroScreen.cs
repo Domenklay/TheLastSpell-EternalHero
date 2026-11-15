@@ -386,7 +386,9 @@ namespace EternalHero.Plugin
         private void DrawTraits(HeroProfile p)
         {
             int traitSlots = Math.Min(6, 1 + mod.Progression.Rank("legacy.trait"));
-            int perkSlots = Math.Min(8, mod.Progression.Rank("legacy.perk"));
+            // Permanent protagonist can select any vanilla perk, not only the usual
+            // handful of weapon specialization columns.
+            int perkSlots = int.MaxValue;
             FrameHeader("ЧЕРТЫ И ПОСТОЯННЫЕ ПЕРКИ",
                 "Сохраняются между забегами. Применяются только к Вечному защитнику.");
             Action(rightPane,"TraitSub",31,113,458,44,
@@ -394,12 +396,12 @@ namespace EternalHero.Plugin
                     choosePerks=false;traitPage=0;traitSearch="";Rebuild();
                 },!choosePerks);
             Action(rightPane,"PerkSub",495,113,458,44,
-                "ПЕРКИ   •   "+(p.SelectedPerks?.Count??0)+"/"+perkSlots,()=>{
+                "ПЕРКИ   •   "+(p.SelectedPerks?.Count??0)+" / ВСЕ",()=>{
                     choosePerks=true;traitPage=0;traitSearch="";Rebuild();
                 },choosePerks);
             int max=choosePerks?perkSlots:traitSlots;
             Label(rightPane,choosePerks ?
-                "ДОСТУПНЫХ СЛОТОВ ПЕРКОВ: "+perkSlots+" (Наследник знаний)" :
+                "ВСЕ ПЕРКИ И ВСЕ УРОВНИ ДОСТУПНЫ ГГ" :
                 "ДОСТУПНЫХ СЛОТОВ ЧЕРТ: "+traitSlots+" (Закалённый ветеран)",
                 32,168,906,38,18,gold,TextAnchor.MiddleLeft,true);
             Field(rightPane,32,211,920,42,traitSearch,"Поиск по названию или ID",v=>{
@@ -467,7 +469,7 @@ namespace EternalHero.Plugin
                 traitPage=Math.Min(pages-1,traitPage+1);Rebuild();
             }).interactable=traitPage+1<pages;
             Label(rightPane,choosePerks ?
-                "Постоянные перки используют оригинальный PerkController. Некоторые особые игровые перки могут быть несовместимы между собой.":
+                "Можно выбрать любой перк из базы игры, независимо от оружия и уровня. Дерево перков ГГ дополнительно открывает все ранги.":
                 "Черты добавляются штатным AddTrait. Несовместимые черты игра может отклонить.",
                 34,632,910,64,16,muted,TextAnchor.UpperLeft);
         }
@@ -636,6 +638,8 @@ namespace EternalHero.Plugin
                 "\nОбнаружение героя: "+(mod.CurrentHero==null?"нет":"да")+
                 "\nТекущая сессия: "+mod.RosterStatus;
             Label(rightPane,t,34,119,925,313,19,parchment,TextAnchor.UpperLeft);
+            Label(rightPane,GameCareerHistory.Summary(p),
+                34,385,921,69,15,gold,TextAnchor.UpperLeft);
             Image(rightPane,"Divider",29,441,926,2,gold);
             Label(rightPane,status,36,458,910,66,18,gold,TextAnchor.UpperLeft);
             if(mod.EnableDebugRewards)
