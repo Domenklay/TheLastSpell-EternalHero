@@ -117,6 +117,27 @@ internal static class Program
             Check(reloaded.MainTreeCompleted, "completion survives save reload");
             Check(reloaded.Profile.AscensionRanks["asc.health"] == 1,
                 "ascension survives save reload");
+            var career = new HeroProfile();
+            Check(CareerHistory.Merge(career, "Kills", 80), "first career snapshot recorded");
+            Check(!CareerHistory.Merge(career, "Kills", 80), "duplicate career snapshot ignored");
+            Check(!CareerHistory.Merge(career, "Kills", 20), "older saved game cannot decrease achievements");
+            Check(CareerHistory.Merge(career, "Kills", 112), "new run increases career totals");
+            Check(CareerHistory.MergeDetail(career, "UsesPerWeapon", "Crossbow", 28),
+                "weapon usage recorded");
+            Check(!CareerHistory.MergeDetail(career, "UsesPerWeapon", "Crossbow", 5),
+                "old weapon use statistics do not replace career values");
+            Check(CareerHistory.MergeDetail(career, "DamagesInflictedToEnemies", "Boss", 7.5),
+                "favourite enemy scores recorded");
+            career.SelectedPerks.Add("SamplePerk");
+            career.UnlockAllPerkTiers = true;
+            store.Save(career);
+            var longTerm = store.Load();
+            Check(longTerm.CareerLifetimeStats["Kills"] == 112,
+                "lifetime achievements survive profile serialization");
+            Check(longTerm.CareerLifetimeDetails["UsesPerWeapon"]["Crossbow"] == 28,
+                "weapon history survives profile serialization");
+            Check(longTerm.UnlockAllPerkTiers && longTerm.SelectedPerks.Contains("SamplePerk"),
+                "unrestricted perk choices survive serialization");
             Console.WriteLine("ALL PROGRESSION TESTS PASSED");
         }
         finally

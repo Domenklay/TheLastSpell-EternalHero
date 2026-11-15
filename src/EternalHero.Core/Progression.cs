@@ -19,6 +19,12 @@ namespace EternalHero.Core
         [DataMember] public bool CreationConfirmed { get; set; }
         [DataMember] public List<string> SelectedTraits { get; set; } = new List<string>();
         [DataMember] public List<string> SelectedPerks { get; set; } = new List<string>();
+        // The separate personal-achievement history is monotonic across runs.
+        [DataMember] public Dictionary<string, double> CareerLifetimeStats { get; set; } =
+            new Dictionary<string, double>();
+        [DataMember] public Dictionary<string, Dictionary<string, double>> CareerLifetimeDetails { get; set; } =
+            new Dictionary<string, Dictionary<string, double>>();
+        [DataMember] public bool UnlockAllPerkTiers { get; set; } = true;
         [DataMember] public bool StarterEssenceGranted { get; set; }
         [DataMember] public long LifetimeExperience { get; set; }
         [DataMember] public long EarnedEssence { get; set; }
@@ -198,6 +204,9 @@ namespace EternalHero.Core
             if (profile.ClaimedRewardIds == null) profile.ClaimedRewardIds = new HashSet<string>();
             if (profile.SelectedTraits == null) profile.SelectedTraits = new List<string>();
             if (profile.SelectedPerks == null) profile.SelectedPerks = new List<string>();
+            if (profile.CareerLifetimeStats == null) profile.CareerLifetimeStats = new Dictionary<string, double>();
+            if (profile.CareerLifetimeDetails == null)
+                profile.CareerLifetimeDetails = new Dictionary<string, Dictionary<string, double>>();
             if (profile.Appearance == null) profile.Appearance = new Dictionary<string, string>();
         }
 
