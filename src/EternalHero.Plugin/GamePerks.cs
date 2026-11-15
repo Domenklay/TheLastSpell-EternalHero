@@ -280,7 +280,25 @@ namespace EternalHero.Plugin
                 if (!db.Contains(id)) { problems.Add(id + ": definition missing"); continue; }
                 try
                 {
-                    if (existing != null && existing.Contains(id)) { total++; continue; }
+                    if (existing != null && existing.Contains(id))
+                    {
+                        // A tree perk can already be instantiated but LOCKED.
+                        // Previously the mere presence of its ID was mistaken for a
+                        // successful permanent grant.
+                        if (!IsLearned(hero, id))
+                        {
+                            var currentController = GameBridge.Get(existing[id], "PerkController");
+                            var unlockExisting = currentController?.GetType().GetMethods()
+                                .FirstOrDefault(m => m.Name == "Unlock" &&
+                                    m.GetParameters().Length == 1 &&
+                                    m.GetParameters()[0].ParameterType.IsInstanceOfType(hero));
+                            if (unlockExisting != null)
+                                unlockExisting.Invoke(currentController, new[] { hero });
+                        }
+                        if (IsLearned(hero, id)) total++;
+                        else problems.Add(id + ": existing perk remained locked");
+                        continue;
+                    }
                     object definition = db[id];
                     var constructor = type.GetConstructors().FirstOrDefault(c =>
                     {
@@ -306,7 +324,8 @@ namespace EternalHero.Plugin
                     });
                     if (unlock == null) { problems.Add(id + ": unlock unavailable"); continue; }
                     unlock.Invoke(controller, new[] { hero });
-                    total++;
+                    if (IsLearned(hero, id)) total++;
+                    else problems.Add(id + ": unlocked state not confirmed");
                 }
                 catch (Exception e)
                 {
