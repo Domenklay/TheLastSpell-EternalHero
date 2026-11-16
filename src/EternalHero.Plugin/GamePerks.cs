@@ -348,92 +348,215 @@ namespace EternalHero.Plugin
             }
         }
 
+        // PerkController.Unlock normally calls TryAddPerk itself. However, in
+        // loaded/procedurally generated trees a perk which is not in the rolled
+        // columns can lack the registration made by UnitPerkTreeController.
+        // Register the *real game Perk object* in the protagonist's own
+        // PlayableUnitPerksController before unlocking it. No perk points,
+        // inventory slots or columns are required for a permanent perk.
+        private static bool RegisterRealPerk(object hero, object perk, string id,
+            ManualLogSource log, out string reason)
+        {
+            reason=null;
+            var controller=GameBridge.Get(hero,"PlayableUnitPerksController");
+            if(controller==null)
+            {
+                reason="Герой ещё не инициализировал PlayableUnitPerksController";
+                return false;
+            }
+            var method=controller.GetType().GetMethods().FirstOrDefault(m=>
+                m.Name=="TryAddPerk"&&m.GetParameters().Length==1&&
+                m.GetParameters()[0].ParameterType.IsInstanceOfType(perk));
+            if(method==null)
+            {
+                reason="Не найден штатный PlayableUnitPerksController.TryAddPerk";
+                return false;
+            }
+            try
+            {
+                method.Invoke(controller,new[]{perk});
+                var dictionary=GameBridge.Get(hero,"Perks") as IDictionary;
+                if(dictionary==null||!dictionary.Contains(id))
+                {
+                    string actual=GameBridge.Get(GameBridge.Get(perk,"PerkDefinition"),"Id")?.ToString();
+                    reason="Игровой реестр не содержит "+id+" после TryAddPerk"+
+                        (actual==id?"":" (ID созданного перка: "+(actual??"?")+")");
+                    return false;
+                }
+                return true;
+            }
+            catch(Exception ex)
+            {
+                reason="Ошибка регистрации перка: "+ex.GetBaseException().Message;
+                log.LogWarning("Eternal Hero perk registry "+id+": "+ex);
+                return false;
+            }
+        }
+
+        private static string ExplainPerkState(object hero,string id)
+        {
+            var dictionary=GameBridge.Get(hero,"Perks") as IDictionary;
+            if(dictionary==null) return "Игровой словарь Perks недоступен";
+            if(!dictionary.Contains(id)) return "Перка нет в реестре героя";
+            var perk=dictionary[id];
+            bool unlocked=GameBridge.Get(perk,"Unlocked") is bool b && b;
+            bool heroUnlocker=GameBridge.Get(perk,"IsUnlockedFromPlayableUnit") is bool a && a;
+            bool itemUnlocker=GameBridge.Get(perk,"IsUnlockedFromItem") is bool c && c;
+            bool isNative=GameBridge.Get(perk,"IsNative") is bool n && n;
+            return "Запись есть; активен="+unlocked+"; владелец="+heroUnlocker+
+                "; от предмета="+itemUnlocker+"; собственный="+isNative;
+        }
+
+        private static bool TryUnlockForHero(object controller,object hero,string id,
+            ManualLogSource log,out string error)
+        {
+            error=null;
+            var method=controller?.GetType().GetMethods().FirstOrDefault(m=>
+                m.Name=="Unlock"&&m.GetParameters().Length==1&&
+                m.GetParameters()[0].ParameterType.IsInstanceOfType(hero));
+            if(method==null)
+            {
+                error="PerkController.Unlock(IPerkUnlocker) не найден";
+                return false;
+            }
+            try
+            {
+                method.Invoke(controller,new[]{hero});
+                if(IsLearned(hero,id))return true;
+                error="Unlock вызван, но перк не активировался: "+
+                    ExplainPerkState(hero,id);
+                return false;
+            }
+            catch(Exception ex)
+            {
+                // Some special perks throw in their UI refresh after the actual
+                // stat/event hooks have been applied; verify the effect state
+                // instead of blindly reporting a successful or failed unlock.
+                if(IsLearned(hero,id))
+                {
+                    log.LogWarning("Eternal Hero perk "+id+
+                        ": unlocked, but UI follow-up threw "+ex.GetBaseException().Message);
+                    return true;
+                }
+                error="Ошибка PerkController.Unlock: "+ex.GetBaseException().Message+
+                    "; "+ExplainPerkState(hero,id);
+                return false;
+            }
+        }
+
         internal static string Grant(object hero, HeroProfile profile, ManualLogSource log)
         {
-            if (hero == null || profile == null) return "no hero";
-            UnlockAllTiers(hero, profile, log);
-            var selected = profile.SelectedPerks;
-            if (selected == null || selected.Count == 0) return "no permanent perks selected";
-            var db = GameBridge.StaticGet(Database, "PerkDefinitions") as IDictionary;
-            if (db == null) return "perk database unavailable";
-            var type = AccessTools.TypeByName("TheLastStand.Controller.Unit.Perk.PerkController");
-            if (type == null) return "PerkController unavailable";
-            // The user explicitly chose an unrestricted permanent protagonist.
-            // All vanilla perk definitions may be selected, not merely the usual three
-            // weapon-focused choices. Selection still requires user action.
-            int slots = selected.Count;
-            var existing = GameBridge.Get(hero, "Perks") as IDictionary;
-            int total = 0;
-            var problems = new List<string>();
-            foreach (string id in selected.Distinct())
+            if(hero==null||profile==null) return "Герой ещё не загружен";
+            UnlockAllTiers(hero,profile,log);
+            var selected=profile.SelectedPerks;
+            if(selected==null || selected.Count==0)
+                return "Постоянные перки не выбраны";
+            var db=GameBridge.StaticGet(Database,"PerkDefinitions") as IDictionary;
+            if(db==null)return "База PerkDefinitions пока не загружена";
+            var type=AccessTools.TypeByName("TheLastStand.Controller.Unit.Perk.PerkController");
+            if(type==null)return "PerkController отсутствует";
+            var existing=GameBridge.Get(hero,"Perks") as IDictionary;
+            if(existing==null)return "Игровой список Perks героя не готов";
+            int active=0;
+            var problems=new List<string>();
+            foreach(var id in selected.Where(x=>!string.IsNullOrWhiteSpace(x)).Distinct())
             {
-                if (!db.Contains(id)) { problems.Add(id + ": definition missing"); continue; }
+                if(!db.Contains(id))
+                {
+                    const string missing="ID отсутствует в текущей игровой базе";
+                    NoteGrantFailure(id,missing,log);
+                    problems.Add(id+": "+missing);
+                    continue;
+                }
+                if(IsLearned(hero,id))
+                {
+                    LastGrantFailures.Remove(id);
+                    active++;
+                    continue;
+                }
                 try
                 {
-                    if (existing != null && existing.Contains(id))
+                    object controller=null;
+                    if(existing.Contains(id))
                     {
-                        // A tree perk can already be instantiated but LOCKED.
-                        // Previously the mere presence of its ID was mistaken for a
-                        // successful permanent grant.
-                        if (!IsLearned(hero, id))
+                        var perk=existing[id];
+                        controller=GameBridge.Get(perk,"PerkController");
+                        if(controller==null)
                         {
-                            var currentController = GameBridge.Get(existing[id], "PerkController");
-                            var unlockExisting = currentController?.GetType().GetMethods()
-                                .FirstOrDefault(m => m.Name == "Unlock" &&
-                                    m.GetParameters().Length == 1 &&
-                                    m.GetParameters()[0].ParameterType.IsInstanceOfType(hero));
-                            if (unlockExisting != null)
-                                unlockExisting.Invoke(currentController, new[] { hero });
+                            var why="Существующий Perk не содержит PerkController";
+                            NoteGrantFailure(id,why,log);
+                            problems.Add(id+": "+why);
+                            continue;
                         }
-                        if (IsLearned(hero, id)) total++;
-                        else problems.Add(id + ": existing perk remained locked");
-                        log.LogInfo("Eternal Hero permanent perk "+id+
-                            ": "+RuntimeState(hero,id));
-                        continue;
                     }
-                    object definition = db[id];
-                    var constructor = type.GetConstructors().FirstOrDefault(c =>
+                    else
                     {
-                        var args = c.GetParameters();
-                        return args.Length == 7 &&
-                            args[0].ParameterType.IsInstanceOfType(definition) &&
-                            args[2].ParameterType.IsInstanceOfType(hero) &&
-                            args[4].ParameterType == typeof(string) &&
-                            args[5].ParameterType == typeof(bool) &&
-                            args[6].ParameterType == typeof(bool);
-                    });
-                    if (constructor == null) { problems.Add(id + ": constructor unavailable"); continue; }
-                    var controller = constructor.Invoke(new object[] {
-                        definition, null, hero, null, string.Empty, true, false
-                    });
-                    var perk = GameBridge.Get(controller, "Perk");
-                    if (perk == null) { problems.Add(id + ": new perk missing"); continue; }
-                    var unlock = type.GetMethods().FirstOrDefault(m =>
+                        object definition=db[id];
+                        var constructor=type.GetConstructors().FirstOrDefault(c=>
+                        {
+                            var args=c.GetParameters();
+                            return args.Length==7&&
+                                args[0].ParameterType.IsInstanceOfType(definition)&&
+                                args[2].ParameterType.IsInstanceOfType(hero)&&
+                                args[4].ParameterType==typeof(string)&&
+                                args[5].ParameterType==typeof(bool)&&
+                                args[6].ParameterType==typeof(bool);
+                        });
+                        if(constructor==null)
+                        {
+                            var why="Конструктор штатного PerkController недоступен";
+                            NoteGrantFailure(id,why,log);
+                            problems.Add(id+": "+why);
+                            continue;
+                        }
+                        // As for the game's glyph perks: native=true, fromRace=false.
+                        controller=constructor.Invoke(new object[]{
+                            definition,null,hero,null,string.Empty,true,false
+                        });
+                        object perk=GameBridge.Get(controller,"Perk");
+                        if(perk==null)
+                        {
+                            var why="Игра не создала объект Perk";
+                            NoteGrantFailure(id,why,log);
+                            problems.Add(id+": "+why);
+                            continue;
+                        }
+                        // Explicit registration handles all perk definitions,
+                        // including those absent from randomized tier columns.
+                        if(!RegisterRealPerk(hero,perk,id,log,out string why))
+                        {
+                            NoteGrantFailure(id,why,log);
+                            problems.Add(id+": "+why);
+                            continue;
+                        }
+                    }
+                    if(TryUnlockForHero(controller,hero,id,log,out string error))
                     {
-                        var args = m.GetParameters();
-                        return m.Name == "Unlock" && args.Length == 1 &&
-                            args[0].ParameterType.IsInstanceOfType(hero);
-                    });
-                    if (unlock == null) { problems.Add(id + ": unlock unavailable"); continue; }
-                    unlock.Invoke(controller, new[] { hero });
-                    if (IsLearned(hero, id)) total++;
-                    else problems.Add(id + ": unlocked state not confirmed");
-                    if(IsLearned(hero,id)) LastGrantFailures.Remove(id);
-                    else NoteGrantFailure(id,"Unlock completed but no owner unlocker. "+
-                        "Perk definition or game UI rejected activation.",log);
-                    log.LogInfo("Eternal Hero permanent perk "+id+
-                        ": "+RuntimeState(hero,id));
+                        active++;
+                        LastGrantFailures.Remove(id);
+                        log.LogInfo("Eternal Hero permanent perk ACTIVE: "+id+"; "+
+                            ExplainPerkState(hero,id));
+                    }
+                    else
+                    {
+                        NoteGrantFailure(id,error,log);
+                        problems.Add(id+": "+error);
+                    }
                 }
-                catch (Exception e)
+                catch(Exception ex)
                 {
-                    string why=e.GetBaseException().Message;
-                    problems.Add(id + ": " + why);
+                    string why=ex.GetBaseException().Message+
+                        "; "+ExplainPerkState(hero,id);
                     NoteGrantFailure(id,why,log);
+                    problems.Add(id+": "+why);
+                    log.LogWarning("Eternal Hero failed perk "+id+" full trace: "+ex);
                 }
             }
-            var summary = "perks active/already available=" + total + "/" + slots;
-            if (problems.Count > 0) summary += "; errors=" + string.Join(" | ",problems.Take(5).ToArray());
-            return summary;
+            string result="Активно "+active+"/"+selected.Distinct().Count();
+            if(problems.Count>0)result+=" • Ошибки: "+
+                string.Join(" | ",problems.Take(3).ToArray());
+            return result;
         }
+
     }
 }
