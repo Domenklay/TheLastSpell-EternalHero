@@ -174,7 +174,41 @@ namespace EternalHero.Plugin
             if (dictionary == null || !dictionary.Contains(id)) return false;
             // Item-granted buffs are not a purchased perk. Count only a perk
             // explicitly unlocked by the playable character, not by equipment.
-            return GameBridge.Get(dictionary[id], "IsUnlockedFromPlayableUnit") is bool value && value;
+            var perk = dictionary[id];
+            return GameBridge.Get(perk,"Unlocked") is bool unlocked && unlocked &&
+                GameBridge.Get(perk, "IsUnlockedFromPlayableUnit") is bool value && value;
+        }
+
+        // The randomized six-column vanilla skill tree is NOT an authoritative
+        // record of all learned perks. Native/off-tree perks live in hero.Perks and
+        // have no PerkTier (and therefore no icon in that randomized tree).
+        // A learned perk's effects are installed by PerkController.Unlock, which
+        // calls Hook and its native perk modules.
+        internal static string RuntimeState(object hero,string id)
+        {
+            if(hero==null) return "НЕТ ГЕРОЯ";
+            var perks=GameBridge.Get(hero,"Perks") as IDictionary;
+            if(perks==null || !perks.Contains(id)) return "НЕ ВЫДАН";
+            var perk=perks[id];
+            if(!IsLearned(hero,id)) return "НЕ АКТИВИРОВАН";
+            return GameBridge.Get(perk,"PerkTier")==null
+                ? "ВЫДАН • ВНЕ СЛУЧАЙНОГО ДЕРЕВА"
+                : "ВЫДАН • В ДЕРЕВЕ";
+        }
+
+        internal static bool NeedsPermanentSync(object hero,HeroProfile profile)
+        {
+            return hero!=null && profile?.SelectedPerks!=null &&
+                profile.SelectedPerks.Any(id=>!IsLearned(hero,id));
+        }
+
+        internal static string PermanentDiagnostic(object hero,HeroProfile profile)
+        {
+            var chosen=profile?.SelectedPerks?.Distinct().ToArray()??new string[0];
+            int active=chosen.Count(id=>IsLearned(hero,id));
+            return "Постоянные перки: выдано "+active+"/"+chosen.Length+
+                (hero==null?" • начни забег":
+                 active<chosen.Length?" • нажми «Применить», если нет эффекта":" • эффект зависит от условий");
         }
 
         // This works with the game's original PerkController, but does not add new columns
@@ -342,6 +376,8 @@ namespace EternalHero.Plugin
                         }
                         if (IsLearned(hero, id)) total++;
                         else problems.Add(id + ": existing perk remained locked");
+                        log.LogInfo("Eternal Hero permanent perk "+id+
+                            ": "+RuntimeState(hero,id));
                         continue;
                     }
                     object definition = db[id];
@@ -371,6 +407,8 @@ namespace EternalHero.Plugin
                     unlock.Invoke(controller, new[] { hero });
                     if (IsLearned(hero, id)) total++;
                     else problems.Add(id + ": unlocked state not confirmed");
+                    log.LogInfo("Eternal Hero permanent perk "+id+
+                        ": "+RuntimeState(hero,id));
                 }
                 catch (Exception e)
                 {
