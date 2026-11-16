@@ -507,7 +507,7 @@ namespace EternalHero.Plugin
                     trait.Restricted?"НЕДОСТУПНА РАСЕ":"ДОСТУПНА");
             Label(popup.transform,facts,22,75,875,69,16,parchment,TextAnchor.UpperLeft);
             Image(popup.transform,"DescriptionRule",20,150,885,1,gold);
-            Label(popup.transform,"ПОЛНОЕ ОПИСАНИЕ ИЗ ИГРОВОЙ БАЗЫ",22,158,860,30,
+            Label(popup.transform,"ОПИСАНИЕ И ЭФФЕКТЫ",22,158,860,30,
                 16,gold,TextAnchor.MiddleLeft,true);
             Label(popup.transform,
                 string.IsNullOrWhiteSpace(trait.Description)?trait.Id:trait.Description,
@@ -522,7 +522,7 @@ namespace EternalHero.Plugin
                 if(perkCache==null||perkCache.Length==0)
                     perkCache=GamePerks.Available().Select(x=>new TraitEntry{
                         Id=x.Id,Name=x.Name,Category=x.Collection,Tier=x.Tier,
-                        Description=x.Id,Categories=new[]{"ОСОБЫЕ"}
+                        Description=x.Description,Categories=new[]{"ОСОБЫЕ"}
                     }).ToArray();
                 return perkCache;
             }

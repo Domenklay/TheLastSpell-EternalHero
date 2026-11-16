@@ -50,6 +50,7 @@ namespace EternalHero.Plugin
         {
             public string Id;
             public string Name;
+            public string Description;
             public string Collection = "Общие";
             public int Tier;
         }
@@ -64,7 +65,27 @@ namespace EternalHero.Plugin
             {
                 if (!(entry.Key is string id)) continue;
                 string name = GameBridge.Get(entry.Value, "Name")?.ToString();
-                var option = new Option { Id = id, Name = string.IsNullOrWhiteSpace(name) ? id : name };
+                string description=null;
+                try
+                {
+                    var method=entry.Value.GetType().GetMethods(
+                        System.Reflection.BindingFlags.Instance |
+                        System.Reflection.BindingFlags.Public)
+                        .FirstOrDefault(m=>m.Name=="GetDescription"&&
+                            m.GetParameters().Length==1);
+                    if(method!=null)
+                        description=method.Invoke(entry.Value,new object[]{null})?.ToString();
+                }
+                catch { }
+                if (!string.IsNullOrWhiteSpace(description))
+                    description=System.Text.RegularExpressions.Regex.Replace(
+                        description,"<[^>]*>","").Trim();
+                var option = new Option {
+                    Id = id, Name = string.IsNullOrWhiteSpace(name) ? id : name,
+                    Description = string.IsNullOrWhiteSpace(description)
+                        ? "Подробности доступны в стандартном описании перка игры."
+                        : description
+                };
                 list.Add(option);
                 byId[id] = option;
             }

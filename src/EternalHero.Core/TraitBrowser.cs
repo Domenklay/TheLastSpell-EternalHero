@@ -26,23 +26,23 @@ namespace EternalHero.Core
                 {
                     if (string.IsNullOrWhiteSpace(stat)) continue;
                     string s = stat.ToLowerInvariant();
+                    int before=set.Count;
                     if (Has(s, "critical", "crit", "accuracy", "reliability", "opportunistic"))
                         set.Add("ТОЧНОСТЬ");
-                    else if (Has(s, "armor", "armour", "block", "resist", "dodge",
+                    if (Has(s, "armor", "armour", "block", "resist", "dodge",
                                    "shield", "protection"))
                         set.Add("ЗАЩИТА");
-                    else if (Has(s, "manaregen", "mana", "magicpoint"))
+                    if (Has(s, "manaregen", "mana", "magicpoint"))
                         set.Add("МАНА");
-                    else if (Has(s, "health", "hitpoint", "healing", "heal", "life"))
+                    if (Has(s, "health", "hitpoint", "healing", "heal", "life"))
                         set.Add("ЗДОРОВЬЕ");
-                    else if (Has(s, "movepoint", "movement", "actionpoint", "skillrange",
+                    if (Has(s, "movepoint", "movement", "actionpoint", "skillrange",
                                    "range", "jump", "momentum"))
                         set.Add("ПОДВИЖНОСТЬ");
-                    else if (Has(s, "damage", "attack", "physical", "magical", "magic",
+                    if (Has(s, "damage", "attack", "physical", "magical", "magic",
                                    "poison", "propagation", "multihit", "stun"))
                         set.Add("УРОН");
-                    else
-                        set.Add("ОСОБЫЕ");
+                    if(before==set.Count) set.Add("ОСОБЫЕ");
                 }
             }
             if (set.Count == 0) set.Add("ОСОБЫЕ");

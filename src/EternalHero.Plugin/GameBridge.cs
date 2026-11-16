@@ -148,8 +148,20 @@ namespace EternalHero.Plugin
                             catch { }
                         }
                     }
-                    trait.Description = string.Join(", ", statDescriptions.Take(3).ToArray());
+                    trait.Description = string.Join(", ", statDescriptions.ToArray());
                 }
+                // Native descriptions are already localized to the player's language and
+                // include ALL equipment-slot and stat modifiers, not only first three.
+                try
+                {
+                    var description= e.Value.GetType().GetMethod("GetDescription",
+                        BindingFlags.Instance|BindingFlags.Public, null, Type.EmptyTypes, null)
+                        ?.Invoke(e.Value,null)?.ToString();
+                    if (!string.IsNullOrWhiteSpace(description))
+                        trait.Description=System.Text.RegularExpressions.Regex.Replace(
+                            description, "<[^>]*>", "").Trim();
+                }
+                catch { }
                 var forbidden = Get(e.Value, "RaceIncompatibilities") as IEnumerable;
                 if (forbidden != null)
                     foreach (object race in forbidden) if (race != null) trait.ForbiddenRaces.Add(race.ToString());

@@ -158,6 +158,9 @@ internal static class Program
             Check(TraitBrowser.MatchesCategory(new [] { "ЗАЩИТА" }, "ВСЕ") &&
                 !TraitBrowser.MatchesCategory(new [] { "ЗАЩИТА" }, "МАНА"),
                 "category selection filters entries without losing them");
+            var mixed = TraitBrowser.CategoriesFor(new[]{"CriticalDamage"});
+            Check(mixed.Contains("УРОН") && mixed.Contains("ТОЧНОСТЬ"),
+                "critical damage may appear in both relevant categories");
             Console.WriteLine("ALL PROGRESSION TESTS PASSED");
         }
         finally
