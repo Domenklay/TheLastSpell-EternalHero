@@ -14,7 +14,7 @@ namespace EternalHero.Plugin
     public sealed class Plugin : BaseUnityPlugin
     {
         internal const string Id = "domenklay.tls.eternalhero";
-        internal const string Version = "0.11.0";
+        internal const string Version = "0.12.0";
 
         private Harmony harmony;
         private ProfileStore store;
@@ -22,6 +22,7 @@ namespace EternalHero.Plugin
         private HeroScreen screen;
         private RunRewards runRewards;
         private ConfigEntry<bool> applyBonuses;
+        private ConfigEntry<bool> freeUpgradeTree;
         private ConfigEntry<bool> debugRewards;
         private ConfigEntry<bool> openOnStartup;
         private ConfigEntry<float> editorScale;
@@ -50,6 +51,8 @@ namespace EternalHero.Plugin
                     "Enable the manual debug XP button.");
                 applyBonuses = Config.Bind("Eternal Hero", "ApplyVerifiedStatBonuses", true,
                     "Automatically apply purchased stat upgrades to the protagonist on a NEW run.");
+                freeUpgradeTree = Config.Bind("Eternal Hero", "FreeUpgradeTree", true,
+                    "Buy any meta upgrade/technique regardless of prerequisites. Essence and rank costs remain.");
                 openOnStartup = Config.Bind("Interface", "OpenCreatorOnStartupV06", false,
                     "Open the native Unity character creator on game startup.");
                 removeRacePenalties = Config.Bind("Eternal Hero", "RemoveNegativeRaceEffects", true,
@@ -57,7 +60,8 @@ namespace EternalHero.Plugin
                 editorScale = Config.Bind("Interface", "MenuScale", .78f,
                     "Scale of the character creator window. Allowed range: 0.58 to 1.00.");
                 store = new ProfileStore(Path.Combine(Paths.ConfigPath, "EternalHero", "profile.json"));
-                progression = new ProgressionService(store.Load());
+                progression = new ProgressionService(store.Load(),freeUpgradeTree.Value);
+                Logger.LogInfo("Eternal Hero free meta progression: "+progression.IgnorePrerequisites);
                 runRewards = new RunRewards(progression);
                 int legacyCompensation = runRewards.CompensateEarlyEconomy();
                 if (legacyCompensation>0)
