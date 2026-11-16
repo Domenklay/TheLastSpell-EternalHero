@@ -44,3 +44,20 @@
 - **Больше нет ZIP внутри ZIP**: артефакт GitHub Actions напрямую содержит папку `BepInEx/` и `INSTALL.md`. Распаковывать только один раз.
 
 Это исправление исходников и автоматической сборки; работу новых очков действий необходимо подтвердить внутри The Last Spell.
+
+
+## v0.13 — weapon-independent skills shown on the game's skill bar
+
+The Last Spell already supports **native hero skills** (such as Punch) alongside equipment skills. They are displayed on its standard `PlayableSkillBar` without using any item, consumable or inventory slot.
+
+The previous integration placed custom skills in `PlayableUnit.NativeSkills` but **never invalidated the bar's cached buttons**, so the new skills could remain invisible after purchase. It also never retried if TLS.ModKit loaded SkillDefinitions later than the new roster.
+
+Version 0.13 fixes both:
+- Calls the original `PlayableSkillBar.Refresh(true)` and the character-sheet `RefreshSkills(hero)` after skill grants and upgrades.
+- Every 6 seconds checks learned skills for a missing/obsolete rank, reattaches them once the TLS.ModKit database is ready, and refreshes the bar once the hero is selected.
+- Uses the same game-native `SkillController(SkillDefinition, hero)` path as built-in native skills. **Never creates scroll items or uses inventory/equipment slots.**
+- Shows in **Техники** the number of skills registered by TLS.ModKit, purchased by the hero, and successfully placed in `NativeSkills`.
+- Adds a **ВЫДАТЬ УМЕНИЯ** button for immediate manual retry, without resetting ranks, spending essence or opening the inventory.
+- Keeps upgrading skill tiers and restoring them on loaded saves.
+
+**Important:** GitHub CI checks DLL compilation and XML structure, but cannot run the commercial game. Skill registrations and their action effects need an in-game test. If the counter shows `0/7` definitions, TLS.ModKit is missing, isn't loading the patch directory, or rejected the XML; inspect `BepInEx/LogOutput.log` for `[ModKit][Skills]`.
