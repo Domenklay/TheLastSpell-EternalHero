@@ -79,8 +79,12 @@ namespace EternalHero.Plugin
             try { negative = Convert.ToSingle(raceValue); }
             catch { return; }
             if (negative >= 0f || float.IsNaN(negative)) return;
-            var controller = GameBridge.Get(__instance, "PlayableUnitStatsController");
-            var unit = GameBridge.Get(GameBridge.Get(controller, "UnitStats"), "Unit");
+            // PlayableUnitStat inherits UnitStatsController from UnitStat. There is
+            // NO PlayableUnitStatsController property on the stat itself: the old
+            // lookup was always null and racial-stat suppression never ran.
+            var controller = GameBridge.Get(__instance, "UnitStatsController");
+            var stats = GameBridge.Get(controller, "UnitStats");
+            var unit = GameBridge.Get(stats, "Unit");
             if (IsOurHero(unit)) __result -= negative;
         }
     }
