@@ -484,8 +484,8 @@ namespace EternalHero.Plugin
                         if(controller==null)
                         {
                             var why="Существующий Perk не содержит PerkController";
-                            NoteGrantFailure(id,why,log);
-                            problems.Add(id+": "+why);
+                            NoteGrantFailure(id,errorNote,log);
+                            problems.Add(id+": "+errorNote);
                             continue;
                         }
                     }
@@ -504,9 +504,9 @@ namespace EternalHero.Plugin
                         });
                         if(constructor==null)
                         {
-                            var why="Конструктор штатного PerkController недоступен";
-                            NoteGrantFailure(id,why,log);
-                            problems.Add(id+": "+why);
+                            var errorNote="Конструктор штатного PerkController недоступен";
+                            NoteGrantFailure(id,errorNote,log);
+                            problems.Add(id+": "+errorNote);
                             continue;
                         }
                         // As for the game's glyph perks: native=true, fromRace=false.
@@ -516,17 +516,17 @@ namespace EternalHero.Plugin
                         object perk=GameBridge.Get(controller,"Perk");
                         if(perk==null)
                         {
-                            var why="Игра не создала объект Perk";
-                            NoteGrantFailure(id,why,log);
-                            problems.Add(id+": "+why);
+                            var errorNote="Игра не создала объект Perk";
+                            NoteGrantFailure(id,errorNote,log);
+                            problems.Add(id+": "+errorNote);
                             continue;
                         }
                         // Explicit registration handles all perk definitions,
                         // including those absent from randomized tier columns.
                         if(!RegisterRealPerk(hero,perk,id,log,out string why))
                         {
-                            NoteGrantFailure(id,why,log);
-                            problems.Add(id+": "+why);
+                            NoteGrantFailure(id,errorNote,log);
+                            problems.Add(id+": "+errorNote);
                             continue;
                         }
                     }
