@@ -1,4 +1,4 @@
-name: Build Eternal Hero v0.17
+name: Build Eternal Hero v0.18
 
 on:
   push:
@@ -32,6 +32,9 @@ jobs:
           assert 'RuntimeState(' in perk and 'NeedsPermanentSync(' in perk
           assert 'RegisterRealPerk(' in perk and '"TryAddPerk"' in perk
           assert 'TryUnlockForHero(' in perk and 'ExplainPerkState(' in perk
+          assert 'CreateOffTreeController(' in perk
+          assert 'BindingFlags.NonPublic | BindingFlags.Instance' in perk
+          assert 'constructor params=' in perk
           ui=Path('src/EternalHero.Plugin/HeroScreen.cs').read_text()
           assert 'ApplyPersistentPerks' in ui and 'Выдача герою:' in ui
           assert 'Get(__instance, "UnitStatsController")' in race
@@ -55,6 +58,12 @@ jobs:
           assert 'SetEnabled(' in skills
           assert 'TheLastStand.View.Skill.SkillView' in skills
           assert 'GetIconSprite' in skills
+          assert 'InstallDamageAdapter(' in skills
+          assert 'ResolveOwnedSkillDamage(' in skills
+          assert 'BaseDamageByLevel' in skills
+          assert 'SkillContainer' in skills
+          plugin=Path('src/EternalHero.Plugin/Plugin.cs').read_text()
+          assert 'GameSkills.InstallDamageAdapter(harmony, Logger)' in plugin
           core=Path('src/EternalHero.Core/Progression.cs').read_text()
           assert '[DataMember] public List<string> DisabledVanillaSkills' in core
           screen=Path('src/EternalHero.Plugin/HeroScreen.cs').read_text()
@@ -71,6 +80,6 @@ jobs:
           cp docs/INSTALL.md package/INSTALL.md
       - uses: actions/upload-artifact@v4
         with:
-          name: EternalHero-v0.17
+          name: EternalHero-v0.18
           path: package/
           if-no-files-found: error
