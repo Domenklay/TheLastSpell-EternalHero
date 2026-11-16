@@ -1,4 +1,4 @@
-name: Build Eternal Hero v0.13
+name: Build Eternal Hero v0.14
 
 on:
   push:
@@ -18,6 +18,24 @@ jobs:
         run: dotnet run --project tests/EternalHero.Tests/EternalHero.Tests.csproj --configuration Release
       - name: Build BepInEx plugin
         run: dotnet build src/EternalHero.Plugin/EternalHero.Plugin.csproj --configuration Release
+      - name: Check permanent perk and racial suppression integration
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          perk=Path('src/EternalHero.Plugin/GamePerks.cs').read_text()
+          race=Path('src/EternalHero.Plugin/RacialPenaltyGuard.cs').read_text()
+          plugin=Path('src/EternalHero.Plugin/Plugin.cs').read_text()
+          assert 'IsUnlockedFromPlayableUnit' in perk
+          assert 'Get(perk,"Unlocked")' in perk
+          assert 'isNative: true' not in perk or 'true, false' in perk
+          assert 'RuntimeState(' in perk and 'NeedsPermanentSync(' in perk
+          assert 'Get(__instance, "UnitStatsController")' in race
+          assert 'Get(__instance, "PlayableUnitStatsController")' not in race
+          assert 'IsFromRace' in race and 'IsOurHero' in race
+          assert 'GamePerks.NeedsPermanentSync(' in plugin
+          print('Static integration invariants checked; runtime game smoke test still required')
+          PY
       - name: Validate optional ModKit skills
         run: |
           python3 - <<'PY'
@@ -54,6 +72,6 @@ jobs:
           cp ModKit/languages.csv package/BepInEx/plugins/EternalHero/ModKit/
       - uses: actions/upload-artifact@v4
         with:
-          name: EternalHero-v0.13
+          name: EternalHero-v0.14
           path: package/
           if-no-files-found: error
