@@ -461,8 +461,12 @@ namespace EternalHero.Plugin
             });
             var host=Image(rightPane,"TraitResults",26,232,941,337,slate);
             traitResultsHost=host.GetComponent<RectTransform>();
-            traitDetailLabel=Label(rightPane,traitDetails,30,570,925,29,
-                14,muted,TextAnchor.MiddleLeft);
+            var hoverBar=Image(rightPane,"HoverTraitBar",30,571,925,100,card);
+            hoverBar.GetComponent<Image>().raycastTarget=false;
+            traitDetailLabel=Label(hoverBar.transform,
+                "Наведи мышь на черту для просмотра эффекта. Кнопка ? открывает полное описание.",
+                12,9,899,81,15,parchment,TextAnchor.UpperLeft);
+            traitDetailLabel.raycastTarget=false;
             RefreshTraitResults(p);
         }
 
@@ -736,6 +740,25 @@ namespace EternalHero.Plugin
                         entry.Restricted?"НЕДОСТУПНА РАСЕ":entry.Description??"";
                     if(note.Length>33) note=note.Substring(0,30)+"…";
                     Label(button.transform,note,left,26,tileWidth-left-27,20,12,muted);
+                    // Native Unity pointer events: hover shows the actual localized
+                    // description without forcing a click or opening a blocking popup.
+                    var hover=button.gameObject.AddComponent<EventTrigger>();
+                    var enter=new EventTrigger.Entry{eventID=EventTriggerType.PointerEnter};
+                    enter.callback.AddListener(_=>{
+                        if(traitDetailLabel && !traitPopup)
+                        {
+                            string description=string.IsNullOrWhiteSpace(target.Description)
+                                ?"Описание отсутствует":target.Description;
+                            traitDetailLabel.text=target.Name+" — "+description;
+                        }
+                    });
+                    hover.triggers.Add(enter);
+                    var leave=new EventTrigger.Entry{eventID=EventTriggerType.PointerExit};
+                    leave.callback.AddListener(_=>{
+                        if(traitDetailLabel && !traitPopup)
+                            traitDetailLabel.text="Наведи мышь на черту для просмотра эффекта. Кнопка ? открывает полное описание.";
+                    });
+                    hover.triggers.Add(leave);
                     Action(button.transform,"Info",tileWidth-27,13,23,24,"?",()=>{
                         ShowTraitDescription(target,isSelected(target.Id),runMode);
                     });
