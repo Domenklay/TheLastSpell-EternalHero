@@ -14,7 +14,7 @@ namespace EternalHero.Plugin
     public sealed class Plugin : BaseUnityPlugin
     {
         internal const string Id = "domenklay.tls.eternalhero";
-        internal const string Version = "0.14.0";
+        internal const string Version = "0.15.0";
 
         private Harmony harmony;
         private ProfileStore store;
@@ -64,6 +64,10 @@ namespace EternalHero.Plugin
                 store = new ProfileStore(Path.Combine(Paths.ConfigPath, "EternalHero", "profile.json"));
                 progression = new ProgressionService(store.Load(),freeUpgradeTree.Value);
                 Logger.LogInfo("Eternal Hero free meta progression: "+progression.IgnorePrerequisites);
+                int refunded=progression.RefundOldUnusableTechniques();
+                if(refunded>0)
+                    Logger.LogInfo("Eternal Hero: refunded "+refunded+
+                        " essence for old nonworking XML technique unlocks.");
                 runRewards = new RunRewards(progression);
                 int legacyCompensation = runRewards.CompensateEarlyEconomy();
                 if (legacyCompensation>0)
