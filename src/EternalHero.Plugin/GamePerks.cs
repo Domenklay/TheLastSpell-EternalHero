@@ -483,7 +483,7 @@ namespace EternalHero.Plugin
                         controller=GameBridge.Get(perk,"PerkController");
                         if(controller==null)
                         {
-                            var why="Существующий Perk не содержит PerkController";
+                            var errorNote="Существующий Perk не содержит PerkController";
                             NoteGrantFailure(id,errorNote,log);
                             problems.Add(id+": "+errorNote);
                             continue;
@@ -523,10 +523,10 @@ namespace EternalHero.Plugin
                         }
                         // Explicit registration handles all perk definitions,
                         // including those absent from randomized tier columns.
-                        if(!RegisterRealPerk(hero,perk,id,log,out string why))
+                        if(!RegisterRealPerk(hero,perk,id,log,out string registrationError))
                         {
-                            NoteGrantFailure(id,errorNote,log);
-                            problems.Add(id+": "+errorNote);
+                            NoteGrantFailure(id,registrationError,log);
+                            problems.Add(id+": "+registrationError);
                             continue;
                         }
                     }
