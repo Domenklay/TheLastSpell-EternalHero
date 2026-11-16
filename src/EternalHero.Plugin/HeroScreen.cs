@@ -25,7 +25,9 @@ namespace EternalHero.Plugin
         private Font font;
         private Sprite tile, gamePanel;
         private GameObject canvasObject, overlay, launcher;
-        private RectTransform rightPane, portraitSlot;
+        private RectTransform rightPane, portraitSlot, selectedSidebar;
+        private GameObject sidebarDescription, traitPopup;
+        private Text selectedSidebarCount;
         private Image portraitImage;
         private int tab;
         private int mainBranchChoice;
@@ -260,8 +262,15 @@ namespace EternalHero.Plugin
             portraitImage.preserveAspect = true;
             Image(left.transform,"GoldDivider",20,451,326,2,gold);
             Label(left.transform,"ПОСТОЯННЫЙ ГЕРОЙ",18,463,329,35,20,parchment,TextAnchor.MiddleCenter,true);
-            Label(left.transform,"Рисунок, лицо, волосы и цвета\nменяются в редакторе самой игры.",
+            var defaultSidebar=Label(left.transform,
+                "Рисунок, лицо, волосы и цвета\nменяются в редакторе самой игры.",
                 24,505,320,72,16,muted,TextAnchor.UpperCenter);
+            sidebarDescription=defaultSidebar.gameObject;
+            var pinned=Image(left.transform,"PinnedTraits",16,502,337,81,card);
+            selectedSidebar=pinned.GetComponent<RectTransform>();
+            selectedSidebarCount=Label(pinned.transform,"ВЫБРАННЫЕ ЧЕРТЫ",8,0,320,22,
+                16,gold,TextAnchor.MiddleLeft,true);
+            pinned.SetActive(false);
             Action(left.transform,"EditAppearance",23,588,320,52,"РЕДАКТОР ВНЕШНОСТИ",() => mod.OpenAppearanceEditor(),true);
 
             var tabs = new[] {"ГЕРОЙ","ЧЕРТЫ","РАЗВИТИЕ","ТЕХНИКИ","ВОЗВЫШЕНИЕ","СВЕДЕНИЯ"};
@@ -310,11 +319,14 @@ namespace EternalHero.Plugin
             for(int i=0;i<tabGraphics.Count;i++)
                 if(tabGraphics[i]) tabGraphics[i].color =
                     i==tab ? new Color(.38f,.26f,.13f) : slate;
+            if(traitPopup) { UnityEngine.Object.Destroy(traitPopup); traitPopup=null; }
             foreach (Transform child in rightPane.Cast<Transform>().ToArray())
                 UnityEngine.Object.Destroy(child.gameObject);
             var profile=mod.Profile;
             if (profile == null) return;
             FindGamePanel();
+            if(sidebarDescription) sidebarDescription.SetActive(tab!=1);
+            if(selectedSidebar) selectedSidebar.gameObject.SetActive(tab==1);
             if(portraitImage!=null)
             {
                 var sprite = GameBridge.Get(mod.CurrentHero,"UiSprite") as Sprite ??
@@ -449,6 +461,60 @@ namespace EternalHero.Plugin
             RefreshTraitResults(p);
         }
 
+        private void RefreshSelectedSidebar(HeroProfile profile)
+        {
+            if(selectedSidebar==null || !selectedSidebar ||
+                !selectedSidebar.gameObject.activeSelf) return;
+            // Destroy only old chips, leaving the header label intact.
+            foreach(Transform child in selectedSidebar.Cast<Transform>().ToArray())
+                if(child.name=="SelectedTraitSummary")
+                    UnityEngine.Object.Destroy(child.gameObject);
+            var picked=choosePerks?profile.SelectedPerks:profile.SelectedTraits;
+            string[] names=(picked??new List<string>()).Select(id=>{
+                var entry=GetTraitEntries(profile).FirstOrDefault(x=>x.Id==id);
+                return entry!=null?entry.Name:id;
+            }).ToArray();
+            int allowed=Math.Min(12,1+mod.Progression.Rank("legacy.trait"));
+            if(selectedSidebarCount)
+                selectedSidebarCount.text=choosePerks
+                    ? "ПОСТОЯННЫЕ ПЕРКИ ("+names.Length+")"
+                    : "ВЫБРАНО ЧЕРТ "+names.Length+"/"+allowed;
+            string left=names.Length==0?"Пока ничего не выбрано":
+                string.Join("  •  ",names.Take(3).ToArray())+
+                    (names.Length>3?"  +"+(names.Length-3):"");
+            var summary=Label(selectedSidebar,left,8,23,322,54,14,parchment,
+                TextAnchor.UpperLeft);
+            summary.gameObject.name="SelectedTraitSummary";
+        }
+
+        private void ShowTraitDescription(TraitEntry trait, bool selected, bool runMode)
+        {
+            if(traitPopup) UnityEngine.Object.Destroy(traitPopup);
+            var popup=Image(rightPane,"TraitFullDescription",29,239,927,323,ink);
+            traitPopup=popup;
+            Image(popup.transform,"DescriptionLine",15,62,895,2,gold);
+            Label(popup.transform,trait.Name,22,13,760,43,24,gold,
+                TextAnchor.MiddleLeft,true);
+            Action(popup.transform,"CloseTraitDescription",846,13,59,42,"✕",()=>{
+                if(traitPopup) UnityEngine.Object.Destroy(traitPopup);
+                traitPopup=null;
+            });
+            string category=choosePerks?(trait.Category??"Общие"):
+                string.Join(" • ",trait.Categories??new string[0]);
+            string facts=(choosePerks?"Специализация: ":"Эффекты: ")+category+
+                (choosePerks?"  •  Ранг: "+trait.Tier:"")+
+                "\nСостояние: "+(selected?(runMode?"ИЗУЧЕН":"ВЫБРАН"):
+                    trait.Restricted?"НЕДОСТУПНА РАСЕ":"ДОСТУПНА");
+            Label(popup.transform,facts,22,75,875,69,16,parchment,TextAnchor.UpperLeft);
+            Image(popup.transform,"DescriptionRule",20,150,885,1,gold);
+            Label(popup.transform,"ПОЛНОЕ ОПИСАНИЕ ИЗ ИГРОВОЙ БАЗЫ",22,158,860,30,
+                16,gold,TextAnchor.MiddleLeft,true);
+            Label(popup.transform,
+                string.IsNullOrWhiteSpace(trait.Description)?trait.Id:trait.Description,
+                23,194,860,102,17,parchment,TextAnchor.UpperLeft);
+            popup.transform.SetAsLastSibling();
+        }
+
         private TraitEntry[] GetTraitEntries(HeroProfile profile)
         {
             if (choosePerks)
@@ -481,6 +547,7 @@ namespace EternalHero.Plugin
             foreach(Transform child in traitResultsHost.Cast<Transform>().ToArray())
                 UnityEngine.Object.Destroy(child.gameObject);
             var entries=GetTraitEntries(profile);
+            RefreshSelectedSidebar(profile);
             var selected=choosePerks?profile.SelectedPerks:profile.SelectedTraits;
             bool runMode=choosePerks&&perkRunMode;
             Func<string,bool> isSelected=id=>runMode
@@ -660,9 +727,7 @@ namespace EternalHero.Plugin
                     if(note.Length>33) note=note.Substring(0,30)+"…";
                     Label(button.transform,note,left,26,tileWidth-left-27,20,12,muted);
                     Action(button.transform,"Info",tileWidth-27,13,23,24,"?",()=>{
-                        traitDetails=target.Name+"  •  "+(target.Description??target.Id)+
-                            (target.Restricted?"  •  НЕДОСТУПНА РАСЕ":"");
-                        if(traitDetailLabel) traitDetailLabel.text=traitDetails;
+                        ShowTraitDescription(target,isSelected(target.Id),runMode);
                     });
                 }
             };
@@ -670,6 +735,7 @@ namespace EternalHero.Plugin
                 traitScrollPosition=scroll.verticalNormalizedPosition;
                 renderVisible();
             });
+            Canvas.ForceUpdateCanvases();
             scroll.verticalNormalizedPosition=Mathf.Clamp01(traitScrollPosition);
             renderVisible();
         }
@@ -804,6 +870,8 @@ namespace EternalHero.Plugin
         private RectTransform Scroll(Transform parent,float x,float y,float w,float h,int contentHeight)
         {
             var view=Image(parent,"ScrollViewport",x,y,w,h,new Color(.045f,.05f,.065f,.96f));
+            // ScrollRect needs a raycast target even over empty spaces between cards.
+            view.GetComponent<Image>().raycastTarget=true;
             var mask=view.AddComponent<Mask>();
             mask.showMaskGraphic=true;
             var scroll=view.AddComponent<ScrollRect>();
