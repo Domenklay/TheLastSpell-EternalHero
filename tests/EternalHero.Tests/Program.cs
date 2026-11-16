@@ -202,7 +202,7 @@ internal static class Program
                 "rescue disabled outside night");
             Check(LastStandPolicy.TryConsume(legacySoul,3,30,40,true),
                 "rescue refreshes on a different night");
-            Check(LastStandPolicy.MinimumRecovery(200)==60,
+            Check(Math.Abs(LastStandPolicy.MinimumRecovery(200)-60f)<0.01f,
                 "rescue restores 30% health");
             Console.WriteLine("ALL PROGRESSION TESTS PASSED");
         }
