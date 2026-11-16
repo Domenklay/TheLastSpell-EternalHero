@@ -1,4 +1,4 @@
-name: Build Eternal Hero v0.11
+name: Build Eternal Hero v0.12
 
 on:
   push:
@@ -43,20 +43,17 @@ jobs:
           assert tele.find('.//Generic') is not None
           print('All 16 special skill XML patches are structurally valid')
           PY
-      - name: Package prototype DLLs
+      - name: Prepare installable artifact
         shell: bash
         run: |
-          mkdir -p package/BepInEx/plugins/EternalHero
+          mkdir -p package/BepInEx/plugins/EternalHero/ModKit/Skills
           cp src/EternalHero.Plugin/bin/Release/netstandard2.0/EternalHero.Plugin.dll package/BepInEx/plugins/EternalHero/
           cp src/EternalHero.Core/bin/Release/netstandard2.0/EternalHero.Core.dll package/BepInEx/plugins/EternalHero/
           cp docs/INSTALL.md package/INSTALL.md
-          mkdir -p package/BepInEx/plugins/EternalHero/ModKit/Skills
           cp ModKit/Skills/*.patch.xml package/BepInEx/plugins/EternalHero/ModKit/Skills/
           cp ModKit/languages.csv package/BepInEx/plugins/EternalHero/ModKit/
-          cd package
-          zip -r ../EternalHero-v0.11.zip BepInEx INSTALL.md
       - uses: actions/upload-artifact@v4
         with:
-          name: EternalHero-v0.11
-          path: EternalHero-v0.11.zip
+          name: EternalHero-v0.12
+          path: package/
           if-no-files-found: error
