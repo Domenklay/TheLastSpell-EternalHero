@@ -15,14 +15,15 @@ namespace EternalHero.Plugin
         {
             logger=log;
             var type=AccessTools.TypeByName("TheLastStand.Controller.Unit.PlayableUnitController");
-            var method=AccessTools.Method(type,"LoseHealth",new[]{
-                typeof(float),AccessTools.TypeByName("TheLastStand.Model.ISkillCaster"),typeof(bool)});
-            // Resolve by signature when the interface namespace differs across game builds.
-            if(method==null && type!=null)
+            MethodInfo method=null;
+            // There is only one public PlayableUnitController.LoseHealth overload with
+            // (float, ISkillCaster, bool). Avoid assuming the interface namespace.
+            if(type!=null)
                 foreach(var m in type.GetMethods(BindingFlags.Public|BindingFlags.Instance))
                     if(m.Name=="LoseHealth"&&m.GetParameters().Length==3 &&
-                        m.GetParameters()[0].ParameterType==typeof(float))
-                    { method=m;break; }
+                        m.GetParameters()[0].ParameterType==typeof(float) &&
+                        m.GetParameters()[2].ParameterType==typeof(bool))
+                    {method=m;break;}
             if(method==null)
             {
                 log.LogWarning("Eternal Hero Last Stand: LoseHealth hook not found");
