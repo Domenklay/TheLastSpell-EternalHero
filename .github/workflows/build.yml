@@ -1,4 +1,4 @@
-name: Build Eternal Hero v0.14
+name: Build Eternal Hero v0.15
 
 on:
   push:
@@ -36,42 +36,28 @@ jobs:
           assert 'GamePerks.NeedsPermanentSync(' in plugin
           print('Static integration invariants checked; runtime game smoke test still required')
           PY
-      - name: Validate optional ModKit skills
+      - name: Verify native skill source integration
+        shell: bash
         run: |
           python3 - <<'PY'
-          import glob, xml.etree.ElementTree as ET
-          ids=set()
-          for name in glob.glob('ModKit/Skills/*.patch.xml'):
-              root=ET.parse(name).getroot()
-              assert root.tag=='Patch' and root.attrib['target']=='SkillDefinition'
-              assert root.attrib['action']=='add'
-              inner=root.find('./Definition/SkillDefinition')
-              assert inner is not None and inner.attrib['Id']==root.attrib['id']
-              ids.add(inner.attrib['Id'])
-          base={'EternalGhostShot','EternalEtherSlash','EternalArcanePulse',
-                'EternalEchoHunter','EternalEchoMage','EternalSecondShot'}
-          mastered={f'{name}{rank}' for name in ['EternalGhostShot','EternalEtherSlash','EternalArcanePulse']
-                    for rank in ['III','V']}
-          echoes={'EternalEchoHunterII','EternalEchoMageII','EternalSecondShotII'}
-          expected=base | mastered | echoes | {'EternalTeleport'}
-          assert ids==expected, (sorted(ids), sorted(expected-ids))
-          tele=ET.parse('ModKit/Skills/eternal_teleport.patch.xml').getroot()
-          assert tele.find('.//AreaOfEffect').text.strip()=='M'
-          assert tele.find('.//Maneuver') is not None
-          assert tele.find('.//Generic') is not None
-          print('All 16 special skill XML patches are structurally valid')
+          from pathlib import Path
+          skills=Path('src/EternalHero.Plugin/GameSkills.cs').read_text()
+          assert 'TheLastStand.Database.ItemDatabase' in skills
+          assert 'SkillsByLevel' in skills and 'AllItemsDefinitions' in skills
+          assert 'PermanentVanillaSkills' in skills and 'NativeSkills' in skills
+          assert 'SkillController' in skills and 'Refresh' in skills
+          assert 'TLS.ModKit' not in skills
+          print('Vanilla item source and slot-free native skill integration checked')
           PY
       - name: Prepare installable artifact
         shell: bash
         run: |
-          mkdir -p package/BepInEx/plugins/EternalHero/ModKit/Skills
+          mkdir -p package/BepInEx/plugins/EternalHero
           cp src/EternalHero.Plugin/bin/Release/netstandard2.0/EternalHero.Plugin.dll package/BepInEx/plugins/EternalHero/
           cp src/EternalHero.Core/bin/Release/netstandard2.0/EternalHero.Core.dll package/BepInEx/plugins/EternalHero/
           cp docs/INSTALL.md package/INSTALL.md
-          cp ModKit/Skills/*.patch.xml package/BepInEx/plugins/EternalHero/ModKit/Skills/
-          cp ModKit/languages.csv package/BepInEx/plugins/EternalHero/ModKit/
       - uses: actions/upload-artifact@v4
         with:
-          name: EternalHero-v0.14
+          name: EternalHero-v0.15
           path: package/
           if-no-files-found: error
