@@ -10,7 +10,7 @@ using HarmonyLib;
 namespace EternalHero.Plugin
 {
     // This version deliberately reuses ORIGINAL skills listed on weapons and
-    // trinkets in ItemDatabase. No TLS.ModKit definitions and no inventory items.
+    // trinkets in ItemDatabase. No external skill definitions and no inventory items.
     internal static class GameSkills
     {
         private const string SkillDb="TheLastStand.Database.Unit.SkillDatabase";
