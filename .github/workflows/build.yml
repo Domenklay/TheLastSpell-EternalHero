@@ -1,4 +1,4 @@
-name: Build Eternal Hero v0.18
+name: Build Eternal Hero v0.19
 
 on:
   push:
@@ -61,6 +61,12 @@ jobs:
           assert 'InstallDamageAdapter(' in skills
           assert 'ResolveOwnedSkillDamage(' in skills
           assert 'BaseDamageByLevel' in skills
+          assert 'RepairZeroBaseDamageRange' in skills
+          assert 'ComputeBaseDamageRange' in skills
+          assert 'IsOurActiveNativeSkill' in skills
+          assert 'GetSourceDamage' in skills
+          assert 'new Vector2Int(lo,hi)' in skills
+          assert 'LogInfo("Eternal Hero: zero damage repaired' in skills
           assert 'SkillContainer' in skills
           plugin=Path('src/EternalHero.Plugin/Plugin.cs').read_text()
           assert 'GameSkills.InstallDamageAdapter(harmony, Logger)' in plugin
@@ -80,6 +86,6 @@ jobs:
           cp docs/INSTALL.md package/INSTALL.md
       - uses: actions/upload-artifact@v4
         with:
-          name: EternalHero-v0.18
+          name: EternalHero-v0.19
           path: package/
           if-no-files-found: error
