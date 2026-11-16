@@ -66,7 +66,11 @@ namespace EternalHero.Core
             if(Profile.RunsStarted>0 && Profile.TotalNightsSurvived>0 &&
                 Profile.Victories==0)
                 backpay=checked(backpay+600); // early player, not a claimed victory
-            if (backpay<=0) return 0;
+            if (backpay<=0)
+            {
+                Profile.ClaimedRewardIds.Add(token); // new profiles cannot retroactively claim later
+                return 0;
+            }
             long before=Profile.EarnedEssence;
             if (!progression.GrantExperience(token,backpay)) return 0;
             return checked((int)(Profile.EarnedEssence-before));
