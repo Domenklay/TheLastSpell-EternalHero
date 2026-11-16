@@ -46,7 +46,7 @@ jobs:
           assert 'SkillsByLevel' in skills and 'AllItemsDefinitions' in skills
           assert 'PermanentVanillaSkills' in skills and 'NativeSkills' in skills
           assert 'SkillController' in skills and 'Refresh' in skills
-          assert 'TLS.ModKit' not in skills
+          assert 'EternalGhostShot' not in skills
           print('Vanilla item source and slot-free native skill integration checked')
           PY
       - name: Prepare installable artifact
