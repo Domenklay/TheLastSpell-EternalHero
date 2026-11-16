@@ -473,9 +473,20 @@ namespace EternalHero.Plugin
             var hoverBar=Image(rightPane,"HoverTraitBar",30,571,925,100,card);
             hoverBar.GetComponent<Image>().raycastTarget=false;
             traitDetailLabel=Label(hoverBar.transform,
-                "Наведи мышь на черту для просмотра эффекта. Кнопка ? открывает полное описание.",
+                string.IsNullOrWhiteSpace(traitDetails)
+                    ? "Наведи мышь на черту для просмотра эффекта. Кнопка ? открывает полное описание."
+                    : traitDetails,
                 12,9,899,81,15,parchment,TextAnchor.UpperLeft);
             traitDetailLabel.raycastTarget=false;
+            if(choosePerks&&!perkRunMode)
+                Action(rightPane,"ApplyPersistentPerks",738,677,216,43,
+                    "ПРИМЕНИТЬ ПЕРКИ",()=>{
+                        if(mod.CurrentHero==null)
+                            traitDetails="Сначала начни забег: главный герой ещё не обнаружен.";
+                        else
+                            traitDetails=GamePerks.Grant(mod.CurrentHero,p,log);
+                        Rebuild();
+                    });
             RefreshTraitResults(p);
         }
 
@@ -525,7 +536,10 @@ namespace EternalHero.Plugin
             string facts=(choosePerks?"Специализация: ":"Эффекты: ")+category+
                 (choosePerks?"  •  Ранг: "+trait.Tier:"")+
                 "\nСостояние: "+(selected?(runMode?"ИЗУЧЕН":"ВЫБРАН"):
-                    trait.Restricted?"НЕДОСТУПНА РАСЕ":"ДОСТУПНА");
+                    trait.Restricted?"НЕДОСТУПНА РАСЕ":"ДОСТУПНА")+
+                (choosePerks && selected && !runMode
+                    ? "\nВыдача герою: "+GamePerks.RuntimeState(mod.CurrentHero,trait.Id)
+                    : "");
             Label(popup.transform,facts,22,75,875,69,16,parchment,TextAnchor.UpperLeft);
             Image(popup.transform,"DescriptionRule",20,150,885,1,gold);
             Label(popup.transform,"ОПИСАНИЕ И ЭФФЕКТЫ",22,158,860,30,
