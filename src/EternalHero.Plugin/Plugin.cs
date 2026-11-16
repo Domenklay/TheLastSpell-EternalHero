@@ -14,7 +14,7 @@ namespace EternalHero.Plugin
     public sealed class Plugin : BaseUnityPlugin
     {
         internal const string Id = "domenklay.tls.eternalhero";
-        internal const string Version = "0.12.0";
+        internal const string Version = "0.13.0";
 
         private Harmony harmony;
         private ProfileStore store;
@@ -32,6 +32,7 @@ namespace EternalHero.Plugin
         private float nextRosterProbeTime;
         private object lastPerkTree;
         private float nextCareerSaveTime;
+        private float nextSkillSynchronization;
 
         internal static Plugin Instance { get; private set; }
         internal HeroProfile Profile => progression?.Profile;
@@ -452,6 +453,15 @@ namespace EternalHero.Plugin
                             GamePerks.UnlockAllTiers(currentHero,Profile,Logger);
                         }
                     }
+                }
+                // TLS.ModKit applies custom SkillDefinitions as databases deserialize.
+                // The character roster and combat bar are often initialized earlier.
+                // Repair missing techniques and rebuild the actual game's combat bar.
+                if (Time.unscaledTime >= nextSkillSynchronization)
+                {
+                    nextSkillSynchronization = Time.unscaledTime + 6f;
+                    if (currentHero!=null && Profile!=null)
+                        GameSkills.Synchronize(currentHero,Profile,Logger);
                 }
                 if (Time.unscaledTime >= nextCareerSaveTime)
                 {
