@@ -37,6 +37,7 @@ internal static class Program
             Check(!PurchasedAttackDamageFloor.Apply(ref low,ref high,176f,224f,0f)
                 && low==23 && high==33,
                 "config value zero disables the floor");
+            low=220;high=280;
             Check(!PurchasedAttackDamageFloor.Apply(ref low,ref high,176f,224f,1.25f)
                 && low==220 && high==280,
                 "damage floor patch is idempotent");
