@@ -29,6 +29,10 @@ namespace EternalHero.Plugin
         private static readonly HashSet<string> WarnedMissingItemDamage=
             new HashSet<string>(StringComparer.Ordinal);
         private static ManualLogSource combatLog;
+        private static readonly HashSet<string> LoggedDamageFallback=
+            new HashSet<string>(StringComparer.Ordinal);
+        private static readonly HashSet<string> LoggedDamageSources=
+            new HashSet<string>(StringComparer.Ordinal);
 
         // The original game's AttackSkillAction.BaseDamage uses
         // Skill.SkillContainer as an Item to read Item.BaseDamages.
@@ -47,32 +51,87 @@ namespace EternalHero.Plugin
                 return;
             }
             harmony.Patch(getter,postfix:new HarmonyMethod(patch));
+            // Second layer: BOTH tooltip preview and combat go through
+            // ComputeBaseDamageRange. If the source-item hook is skipped by
+            // the current game build, correct a genuinely zero attack here.
+            var controller=AccessTools.TypeByName(
+                "TheLastStand.Controller.Skill.SkillAction.AttackSkillActionController");
+            var calculate=controller==null?null:AccessTools.Method(
+                controller,"ComputeBaseDamageRange");
+            var fixRange=AccessTools.Method(typeof(GameSkills),nameof(RepairZeroBaseDamageRange));
+            if(calculate!=null&&fixRange!=null)
+            {
+                harmony.Patch(calculate,postfix:new HarmonyMethod(fixRange));
+                log.LogInfo("Eternal Hero: combat + tooltip zero-damage fallback installed");
+            }
+            else log.LogWarning("Eternal Hero: secondary damage range hook unavailable");
             log.LogInfo("Eternal Hero: native item skill base damage adapter installed");
+        }
+
+        private static bool IsOurActiveNativeSkill(object action,out string id)
+        {
+            id=null;
+            var profile=Plugin.Instance?.Profile;
+            var hero=Plugin.Instance?.CurrentHero;
+            if(hero==null||profile?.PermanentVanillaSkills==null||action==null)
+                return false;
+            var skill=GameBridge.Get(action,"Skill");
+            if(skill==null || !ReferenceEquals(GameBridge.Get(skill,"SkillContainer"),hero))
+                return false;
+            id=GameBridge.Get(GameBridge.Get(skill,"SkillDefinition"),"Id")?.ToString();
+            return id!=null&&profile.PermanentVanillaSkills.Contains(id)&&
+                (profile.DisabledVanillaSkills==null ||
+                 !profile.DisabledVanillaSkills.Contains(id));
+        }
+
+        private static Vector2 GetSourceDamage(string id)
+        {
+            // The catalogue is populated from original item definitions. Retry
+            // once when definitions became available after plugin startup.
+            if(ItemDamageBySkill.Count==0||!ItemDamageBySkill.ContainsKey(id))
+                Available();
+            if(ItemDamageBySkill.TryGetValue(id,out Vector2 found)&&found.y>0f)
+            {
+                if(LoggedDamageSources.Add(id))
+                    combatLog?.LogInfo("Eternal Hero: "+id+" source weapon base damage "+
+                        found.x+"–"+found.y);
+                return found;
+            }
+            if(WarnedMissingItemDamage.Add(id))
+                combatLog?.LogWarning("Eternal Hero: no positive original item base damage for "+
+                    id+"; using conservative virtual-weapon base 18–26");
+            // Some trinket-sourced attack skills have no item weapon damage.
+            // A modest innate base is required while preserving the vanilla
+            // skill's action costs, area, multipliers and effects.
+            return new Vector2(18f,26f);
+        }
+
+        private static void RepairZeroBaseDamageRange(object __instance,
+            ref Vector2Int __result)
+        {
+            if(__result.y>0 || !IsOurActiveNativeSkill(
+                GameBridge.Get(__instance,"SkillAction"),out string id)) return;
+            var action=GameBridge.Get(__instance,"SkillAction");
+            var def=GameBridge.Get(action,"AttackSkillActionDefinition");
+            float multiplier=1f;
+            try{multiplier=Convert.ToSingle(GameBridge.Get(def,"DamageMultiplier")??1f);}
+            catch { }
+            if(multiplier<=0f)return; // a legitimate support-only attack
+            Vector2 source=GetSourceDamage(id);
+            int lo=Mathf.Max(1,Mathf.RoundToInt(source.x*multiplier));
+            int hi=Mathf.Max(lo,Mathf.RoundToInt(source.y*multiplier));
+            __result=new Vector2Int(lo,hi);
+            if(LoggedDamageFallback.Add(id))
+                combatLog?.LogInfo("Eternal Hero: zero damage repaired for "+id+
+                    " using "+source.x+"–"+source.y+", multiplier "+multiplier+
+                    ", output "+lo+"–"+hi+" (tooltip and combat)");
         }
 
         private static void ResolveOwnedSkillDamage(object __instance,ref Vector2 __result)
         {
             if(__result.x>0.001f || __result.y>0.001f)return;
-            var plugin=Plugin.Instance;
-            var hero=plugin?.CurrentHero;
-            var profile=plugin?.Profile;
-            if(hero==null||profile?.PermanentVanillaSkills==null)return;
-            var skill=GameBridge.Get(__instance,"Skill");
-            if(skill==null || !ReferenceEquals(GameBridge.Get(skill,"SkillContainer"),hero))
-                return;
-            string id=GameBridge.Get(GameBridge.Get(skill,"SkillDefinition"),"Id")?.ToString();
-            if(id==null || !profile.PermanentVanillaSkills.Contains(id) ||
-                (profile.DisabledVanillaSkills!=null &&
-                 profile.DisabledVanillaSkills.Contains(id)))return;
-            if(ItemDamageBySkill.Count==0)Available();
-            if(ItemDamageBySkill.TryGetValue(id,out Vector2 baseDamage) &&
-                baseDamage.y>0.001f)
-            {
-                __result=baseDamage; // normal game damage modifiers apply afterward
-            }
-            else if(WarnedMissingItemDamage.Add(id))
-                combatLog?.LogWarning("Eternal Hero: no source weapon damage for "+
-                    id+"; damage may depend on item-specific data");
+            if(!IsOurActiveNativeSkill(__instance,out string id))return;
+            __result=GetSourceDamage(id); // normal game damage modifiers apply afterward
         }
 
         private static readonly Dictionary<string,Sprite> IconCache=
