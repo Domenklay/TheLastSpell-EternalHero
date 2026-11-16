@@ -32,6 +32,13 @@ namespace EternalHero.Plugin
         private int tab;
         private int mainBranchChoice;
         private int specialBranchChoice;
+        private bool showLegacyTechniques;
+        private string vanillaSkillSearch="";
+        private int vanillaSkillFilter;
+        private float vanillaSkillScroll=1f;
+        private RectTransform vanillaSkillHost;
+        private List<GameSkills.StockSkill> vanillaSkillCache;
+        private string vanillaSkillNotice="Навыки берутся из оригинального оружия и украшений.";
         private float progressionScrollPosition=1f;
         private bool choosePerks;
         private bool perkRunMode;
@@ -792,8 +799,154 @@ namespace EternalHero.Plugin
             public string[] Categories;
         }
 
+        private void DrawVanillaSkillLibrary(HeroProfile profile)
+        {
+            FrameHeader("АРСЕНАЛ ВЕЧНОГО ГЕРОЯ",
+                "Оригинальные навыки оружия и украшений. Без предметов, XML и слотов инвентаря.");
+            Label(rightPane,"ЭССЕНЦИЯ "+profile.AvailableEssence+
+                "  •  ЦЕНА "+ProgressionService.VanillaSkillPrice+
+                "  •  КУПЛЕНО "+(profile.PermanentVanillaSkills?.Count??0)+"/40",
+                32,106,908,36,19,gold,TextAnchor.MiddleLeft,true);
+            Action(rightPane,"LegacyTalents",754,146,200,35,"УЗЛЫ ТЕХНИК",()=>{
+                showLegacyTechniques=true;Rebuild();
+            });
+            Label(rightPane,GameSkills.Diagnostic(mod.CurrentHero,profile),
+                32,147,706,39,14,parchment,TextAnchor.MiddleLeft);
+            var field=Field(rightPane,30,196,782,42,vanillaSkillSearch,
+                "Поиск по названию, предмету или ID",null,80);
+            field.onValueChanged.AddListener(x=>{
+                vanillaSkillSearch=x??"";
+                vanillaSkillScroll=1f;
+                RefreshVanillaSkillLibrary(profile);
+            });
+            Action(rightPane,"ClearSkillSearch",825,196,126,42,"ОЧИСТИТЬ",()=>{
+                field.text="";
+                vanillaSkillSearch="";
+                vanillaSkillScroll=1f;
+                RefreshVanillaSkillLibrary(profile);
+            });
+            vanillaSkillHost=Image(rightPane,"StockSkills",25,247,941,371,slate)
+                .GetComponent<RectTransform>();
+            RefreshVanillaSkillLibrary(profile);
+            Label(rightPane,vanillaSkillNotice,31,626,918,57,16,gold,TextAnchor.UpperLeft);
+            Action(rightPane,"SyncStockSkills",750,689,203,37,"ПЕРЕПРОВЕРИТЬ",()=>{
+                if(mod.CurrentHero==null)
+                    vanillaSkillNotice="Сначала загрузи забег с главным героем.";
+                else
+                {
+                    vanillaSkillNotice=GameSkills.Grant(mod.CurrentHero,profile,log);
+                    GameSkills.Synchronize(mod.CurrentHero,profile,log);
+                }
+                Rebuild();
+            });
+        }
+
+        private void RefreshVanillaSkillLibrary(HeroProfile profile)
+        {
+            if(vanillaSkillHost==null||!vanillaSkillHost) return;
+            foreach(Transform child in vanillaSkillHost.Cast<Transform>().ToArray())
+                UnityEngine.Object.Destroy(child.gameObject);
+            if(vanillaSkillCache==null || vanillaSkillCache.Count==0)
+                vanillaSkillCache=GameSkills.Available();
+            string[] filters={"ВСЕ","БЛИЖНИЙ БОЙ","СТРЕЛЬБА","МАГИЯ","УКРАШЕНИЯ","КУПЛЕННЫЕ"};
+            for(int i=0;i<filters.Length;i++)
+            {
+                int selected=i;
+                string kind=filters[i];
+                float x=8+(i%3)*308f, y=6+(i/3)*38f;
+                Action(vanillaSkillHost,"SkillFilter"+i,x,y,301,34,kind,()=>{
+                    vanillaSkillFilter=selected;
+                    vanillaSkillScroll=1f;
+                    RefreshVanillaSkillLibrary(profile);
+                },i==vanillaSkillFilter);
+            }
+            var skills=vanillaSkillCache.Where(x=>
+                vanillaSkillFilter==0 ||
+                vanillaSkillFilter==5&&
+                    profile.PermanentVanillaSkills.Contains(x.Id) ||
+                vanillaSkillFilter>0&&vanillaSkillFilter<5&&
+                    x.Kind==filters[vanillaSkillFilter]);
+            if(!string.IsNullOrWhiteSpace(vanillaSkillSearch))
+            {
+                string search=vanillaSkillSearch.Trim();
+                skills=skills.Where(x=>(x.Name+" "+x.Id+" "+x.Source+" "+x.Kind)
+                    .IndexOf(search,StringComparison.OrdinalIgnoreCase)>=0);
+            }
+            var found=skills.ToArray();
+            Label(vanillaSkillHost,
+                found.Length==0?"НАВЫКОВ НЕ НАЙДЕНО":
+                    "НАЙДЕНО "+found.Length+"  •  ПРОКРУТКА КОЛЁСИКОМ",
+                11,86,918,28,16,gold,TextAnchor.MiddleLeft,true);
+            if(found.Length==0)
+            {
+                Label(vanillaSkillHost,"Открой забег, чтобы загрузились базы предметов и умений.",
+                    12,143,900,79,18,parchment,TextAnchor.MiddleCenter);
+                return;
+            }
+            const float rowHeight=66f;
+            const int columns=2;
+            const float cardWidth=445f;
+            int rows=(found.Length+columns-1)/columns;
+            float height=251f;
+            var content=Scroll(vanillaSkillHost,4,116,932,height,
+                Mathf.CeilToInt(Mathf.Max(height+2,rows*rowHeight+10)));
+            var scroller=content.parent.GetComponent<ScrollRect>();
+            int previousRow=-1;
+            System.Action draw=()=>{
+                if(content==null || !content)return;
+                int first=Mathf.Max(0,Mathf.FloorToInt(
+                    Mathf.Max(0f,content.anchoredPosition.y)/rowHeight)-1);
+                first=Mathf.Min(first,Mathf.Max(0,rows-1));
+                if(first==previousRow)return;
+                previousRow=first;
+                foreach(Transform child in content.Cast<Transform>().ToArray())
+                    UnityEngine.Object.Destroy(child.gameObject);
+                for(int row=first;row<Mathf.Min(rows,first+6);row++)
+                for(int col=0;col<columns;col++)
+                {
+                    int index=row*columns+col;
+                    if(index>=found.Length)break;
+                    var entry=found[index];
+                    var selection=entry;
+                    bool bought=profile.PermanentVanillaSkills.Contains(entry.Id);
+                    float x=8+col*457f,y=6+row*rowHeight;
+                    var card=Image(content,"Stock-"+entry.Id,x,y,cardWidth,60,card);
+                    Label(card.transform,(bought?"✓ ":"")+entry.Name,8,3,285,26,
+                        17,bought?gold:parchment,TextAnchor.MiddleLeft,true);
+                    string source=entry.Kind+" • "+entry.Source;
+                    if(source.Length>46)source=source.Substring(0,43)+"…";
+                    Label(card.transform,source,8,32,288,23,12,muted);
+                    Action(card.transform,"BuyStock"+entry.Id,298,10,138,41,
+                        bought?"КУПЛЕНО":"КУПИТЬ • 4",()=>{
+                            if(bought)
+                                vanillaSkillNotice="Навык «"+selection.Name+
+                                    "» уже куплен и сохраняется между забегами.";
+                            else vanillaSkillNotice=GameSkills.Purchase(mod,selection.Id,log);
+                            vanillaSkillScroll=scroller.verticalNormalizedPosition;
+                            Rebuild();
+                        },bought);
+                }
+            };
+            scroller.onValueChanged.AddListener(_=>{
+                vanillaSkillScroll=scroller.verticalNormalizedPosition;
+                draw();
+            });
+            Canvas.ForceUpdateCanvases();
+            scroller.verticalNormalizedPosition=Mathf.Clamp01(vanillaSkillScroll);
+            draw();
+        }
+
         private void DrawProgression(HeroProfile p, bool special)
         {
+            if(special && !showLegacyTechniques)
+            {
+                DrawVanillaSkillLibrary(p);
+                return;
+            }
+            if(special)
+                Action(rightPane,"ReturnStockSkills",751,113,211,37,
+                    "ИГРОВЫЕ НАВЫКИ",()=>{showLegacyTechniques=false;Rebuild();});
+
             var service = mod.Progression;
             FrameHeader(special ? "ЗАПРЕТНЫЕ ТЕХНИКИ И ЭХА" : "НАСЛЕДИЕ ГЕРОЯ",
                 service.IgnorePrerequisites ?
