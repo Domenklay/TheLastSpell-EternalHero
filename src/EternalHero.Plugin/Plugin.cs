@@ -14,7 +14,7 @@ namespace EternalHero.Plugin
     public sealed class Plugin : BaseUnityPlugin
     {
         internal const string Id = "domenklay.tls.eternalhero";
-        internal const string Version = "0.13.0";
+        internal const string Version = "0.14.0";
 
         private Harmony harmony;
         private ProfileStore store;
@@ -33,6 +33,7 @@ namespace EternalHero.Plugin
         private object lastPerkTree;
         private float nextCareerSaveTime;
         private float nextSkillSynchronization;
+        private float nextPerkSynchronization;
 
         internal static Plugin Instance { get; private set; }
         internal HeroProfile Profile => progression?.Profile;
@@ -462,6 +463,17 @@ namespace EternalHero.Plugin
                     nextSkillSynchronization = Time.unscaledTime + 6f;
                     if (currentHero!=null && Profile!=null)
                         GameSkills.Synchronize(currentHero,Profile,Logger);
+                }
+                if(Time.unscaledTime>=nextPerkSynchronization)
+                {
+                    nextPerkSynchronization=Time.unscaledTime+10f;
+                    if(currentHero!=null && Profile!=null &&
+                        GamePerks.NeedsPermanentSync(currentHero,Profile))
+                    {
+                        Logger.LogWarning("Eternal Hero: permanent perks missing after load; restoring");
+                        Logger.LogInfo("Eternal Hero restored perks: "+
+                            GamePerks.Grant(currentHero,Profile,Logger));
+                    }
                 }
                 if (Time.unscaledTime >= nextCareerSaveTime)
                 {
