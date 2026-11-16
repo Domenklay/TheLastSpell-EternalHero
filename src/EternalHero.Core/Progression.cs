@@ -86,9 +86,9 @@ namespace EternalHero.Core
             new Upgrade("weapon.ranged", "Мастер оружия", "Меткость", "+3% дальнего урона за ранг", 10, 1, "RangedDamage", 3),
             new Upgrade("weapon.magic", "Мастер оружия", "Знание магии", "+3% магического урона за ранг", 10, 1, "MagicDamage", 3),
             new Upgrade("weapon.critical", "Мастер оружия", "Слабые места", "+1% шанса критического удара за ранг", 8, 2, "Critical", 1),
-            new Upgrade("tactics.mobility", "Тактический гений", "Манёвр", "+1 очко передвижения за ранг", 3, 4, "MovePoints", 1),
-            new Upgrade("tactics.range", "Тактический гений", "Дальний взгляд", "+1 к дальности за ранг", 2, 5, "SkillRange", 1),
-            new Upgrade("tactics.action", "Тактический гений", "Дополнительное действие", "+1 очко действий за ранг", 2, 10, "ActionPoints", 1,
+            new Upgrade("tactics.mobility", "Тактический гений", "Манёвр", "+1 очко передвижения за ранг", 3, 2, "MovePoints", 1),
+            new Upgrade("tactics.range", "Тактический гений", "Дальний взгляд", "+1 к дальности за ранг", 2, 3, "SkillRange", 1),
+            new Upgrade("tactics.action", "Тактический гений", "Дополнительное действие", "+1 очко действий за ранг", 2, 4, "ActionPoints", 1,
                 "tactics.mobility", 2),
             new Upgrade("legacy.trait", "Наследие", "Закалённый ветеран", "Открывает дополнительную существующую черту", 11, 6,
                 requiresGameIntegration: true),
@@ -97,11 +97,11 @@ namespace EternalHero.Core
             new Upgrade("legacy.mastery", "Наследие", "Универсал", "Усиление эффектов каждого типа оружия", 5, 5,
                 requiresId: "legacy.perk", requiresRank: 1, requiresGameIntegration: true),
             new Upgrade("forbidden.ghostshot", "Запретные техники", "Призрачный выстрел",
-                "Особая атака дальнего боя без винтовки", 1, 12, requiresId: "tactics.range", requiresRank: 2, requiresGameIntegration: true),
+                "Особая атака дальнего боя без винтовки", 1, 5, requiresId: "tactics.range", requiresRank: 2, requiresGameIntegration: true),
             new Upgrade("forbidden.etherslash", "Запретные техники", "Эфирный клинок",
-                "Круговой удар без оружия ближнего боя", 1, 12, requiresId: "weapon.physical", requiresRank: 5, requiresGameIntegration: true),
+                "Круговой удар без оружия ближнего боя", 1, 5, requiresId: "weapon.physical", requiresRank: 5, requiresGameIntegration: true),
             new Upgrade("forbidden.arcaneburst", "Запретные техники", "Пульс арканы",
-                "Магический взрыв без посоха", 1, 12, requiresId: "weapon.magic", requiresRank: 5, requiresGameIntegration: true),
+                "Магический взрыв без посоха", 1, 5, requiresId: "weapon.magic", requiresRank: 5, requiresGameIntegration: true),
             new Upgrade("body.regeneration", "Стальное тело", "Регенерация", "+2 регенерации HP за ранг", 6, 3, "HealthRegen", 2, null, 0, false),
             new Upgrade("body.manawell", "Стальное тело", "Запас маны", "+4 маны за ранг", 8, 2, "ManaTotal", 4, null, 0, false),
             new Upgrade("body.manaregen", "Стальное тело", "Восстановление маны", "+1 регенерации маны за ранг", 5, 3, "ManaRegen", 1, "body.manawell", 2, false),
@@ -127,7 +127,7 @@ namespace EternalHero.Core
             new Upgrade("weapon.multihit", "Мастер оружия", "Серия ударов", "+1 MultiHitsCountModifier за ранг", 2, 12, "MultiHitsCountModifier", 1, "weapon.critical", 4, false),
             new Upgrade("weapon.trinity", "Мастер оружия", "Абсолютный мастер", "+10 общего урона за ранг", 3, 15, "OverallDamage", 10, "weapon.power", 6, false),
             new Upgrade("tactics.march", "Тактический гений", "Быстрый марш", "+1 передвижения за ранг", 5, 4, "MovePoints", 1, null, 0, false),
-            new Upgrade("tactics.command", "Тактический гений", "Второй темп", "+1 очков действий за ранг", 2, 15, "ActionPoints", 1, "tactics.action", 1, false),
+            new Upgrade("tactics.command", "Тактический гений", "Второй темп", "+1 очков действий за ранг", 2, 6, "ActionPoints", 1, "tactics.action", 1, false),
             new Upgrade("tactics.longshot", "Тактический гений", "Снайперская позиция", "+1 дальности способностей за ранг", 3, 7, "SkillRange", 1, "tactics.range", 2, false),
             new Upgrade("tactics.precision", "Тактический гений", "Хладнокровие", "+5 точности за ранг", 6, 3, "Accuracy", 5, null, 0, false),
             new Upgrade("tactics.stun", "Тактический гений", "Сдерживание", "+4 StunChanceModifier за ранг", 5, 6, "StunChanceModifier", 4, null, 0, false),
@@ -138,7 +138,7 @@ namespace EternalHero.Core
             new Upgrade("tactics.endurance", "Тактический гений", "Марафонец", "+1 регенерации маны за ранг", 5, 4, "ManaRegen", 1, null, 0, false),
             new Upgrade("tactics.spread", "Тактический гений", "Длинная цепь", "+1 PropagationBouncesModifier за ранг", 3, 8, "PropagationBouncesModifier", 1, "tactics.longshot", 1, false),
             new Upgrade("tactics.storm", "Тактический гений", "Удержать фронт", "+7 общего урона за ранг", 3, 12, "OverallDamage", 7, "tactics.command", 2, false),
-            new Upgrade("tactics.teleport", "Тактический гений", "Мгновенный переход", "Открывает Эфирный шаг на 6 клеток (4 маны, 1 ОД), также +3 передвижения", 1, 18, "MovePoints", 3, "tactics.longshot", 2, true),
+            new Upgrade("tactics.teleport", "Тактический гений", "Мгновенный переход", "Открывает Эфирный шаг на 6 клеток (4 маны, 1 ОД), также +3 передвижения", 1, 7, "MovePoints", 3, "tactics.longshot", 2, true),
             new Upgrade("legacy.study", "Наследие", "Книга войны", "+5 ExperienceGain за ранг", 6, 4, "ExperienceGain", 5, null, 0, false),
             new Upgrade("legacy.blood", "Наследие", "Наследственная сила", "+10 HP за ранг", 5, 4, "Health", 10, null, 0, false),
             new Upgrade("legacy.focus", "Наследие", "Искусство точности", "+3 крит. шанса за ранг", 5, 5, "Critical", 3, null, 0, false),
@@ -163,10 +163,10 @@ namespace EternalHero.Core
             new Upgrade("forbidden.storm", "Запретные техники", "Магический шторм", "+6 магического урона за ранг", 5, 7, "MagicDamage", 6, "forbidden.arcanemastery", 3, false),
             new Upgrade("forbidden.focus", "Запретные техники", "Сосредоточение", "+2 дальности способностей за ранг", 2, 10, "SkillRange", 2, "forbidden.ghostmastery", 4, false),
             new Upgrade("forbidden.efficiency", "Запретные техники", "Экономия сил", "+3 регенерации маны за ранг", 3, 10, "ManaRegen", 3, "forbidden.arcanemastery", 4, false),
-            new Upgrade("forbidden.secondshot", "Запретные техники", "Второй призрачный выстрел", "Открывает дополнительный выстрел без AP (TLS.ModKit)", 1, 22, null, 0, "forbidden.ghostmastery", 5, true),
+            new Upgrade("forbidden.secondshot", "Запретные техники", "Второй призрачный выстрел", "Открывает дополнительный выстрел без AP (TLS.ModKit)", 1, 7, null, 0, "forbidden.ghostmastery", 5, true),
             new Upgrade("forbidden.triple", "Запретные техники", "Три школы", "+10 общего урона за ранг", 3, 18, "OverallDamage", 10, "forbidden.arcanemastery", 5, false),
-            new Upgrade("trinity.hunter", "Триединство", "Эхо охотника", "Эхо охотника: бесплатный дальний выстрел раз за ход; усиливается Узорами охотника (TLS.ModKit)", 1, 18, null, 0, "forbidden.ghostshot", 1, true),
-            new Upgrade("trinity.mage", "Триединство", "Эхо мага", "Эхо мага: бесплатный магический взрыв раз за ход; усиливается Узорами чародея (TLS.ModKit)", 1, 18, null, 0, "forbidden.arcaneburst", 1, true),
+            new Upgrade("trinity.hunter", "Триединство", "Эхо охотника", "Эхо охотника: бесплатный дальний выстрел раз за ход; усиливается Узорами охотника (TLS.ModKit)", 1, 7, null, 0, "forbidden.ghostshot", 1, true),
+            new Upgrade("trinity.mage", "Триединство", "Эхо мага", "Эхо мага: бесплатный магический взрыв раз за ход; усиливается Узорами чародея (TLS.ModKit)", 1, 7, null, 0, "forbidden.arcaneburst", 1, true),
             new Upgrade("trinity.coherence", "Триединство", "Связь душ", "+5 общего урона за ранг", 5, 7, "OverallDamage", 5, "trinity.hunter", 1, false),
             new Upgrade("trinity.precision", "Триединство", "Узор охотника", "+4 дальнего урона за ранг", 5, 6, "RangedDamage", 4, "trinity.hunter", 1, false),
             new Upgrade("trinity.arcana", "Триединство", "Узор чародея", "+4 магического урона за ранг", 5, 6, "MagicDamage", 4, "trinity.mage", 1, false),
@@ -195,9 +195,12 @@ namespace EternalHero.Core
         public HeroProfile Profile { get; }
         public const long ExperiencePerEssence = 100;
 
-        public ProgressionService(HeroProfile profile)
+        public bool IgnorePrerequisites { get; }
+
+        public ProgressionService(HeroProfile profile, bool ignorePrerequisites = false)
         {
             Profile = profile ?? throw new ArgumentNullException(nameof(profile));
+            IgnorePrerequisites = ignorePrerequisites;
             if (profile.SchemaVersion != 1) throw new NotSupportedException("Unsupported profile format");
             if (profile.Ranks == null) profile.Ranks = new Dictionary<string, int>();
             if (profile.AscensionRanks == null) profile.AscensionRanks = new Dictionary<string, int>();
@@ -225,13 +228,20 @@ namespace EternalHero.Core
             if (upgrade == null) { reason = "Unknown upgrade"; return false; }
             var rank = Rank(upgradeId);
             if (rank >= upgrade.MaxRank) { reason = "Already max rank"; return false; }
-            if (upgrade.RequiresId != null && Rank(upgrade.RequiresId) < upgrade.RequiresRank)
+            if (!IgnorePrerequisites && upgrade.RequiresId != null &&
+                Rank(upgrade.RequiresId) < upgrade.RequiresRank)
             {
-                reason = "Prerequisite not met"; return false;
+                var required=UpgradeCatalog.Find(upgrade.RequiresId);
+                reason="Требуется «"+(required?.Name??upgrade.RequiresId)+
+                    "» ранг "+upgrade.RequiresRank+" (сейчас "+
+                    Rank(upgrade.RequiresId)+")";
+                return false;
             }
             if (Profile.AvailableEssence < upgrade.CostForNextRank(rank))
             {
-                reason = "Not enough essence"; return false;
+                reason="Нужно "+upgrade.CostForNextRank(rank)+
+                    " эссенции, доступно "+Profile.AvailableEssence;
+                return false;
             }
             reason = null;
             return true;
