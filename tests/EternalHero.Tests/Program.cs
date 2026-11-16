@@ -204,6 +204,27 @@ internal static class Program
                 "rescue refreshes on a different night");
             Check(Math.Abs(LastStandPolicy.MinimumRecovery(200)-60f)<0.01f,
                 "rescue restores 30% health");
+            var strictHero=new ProgressionService(new HeroProfile{AvailableEssence=20});
+            Check(!strictHero.Purchase("tactics.action",out string strictReason) &&
+                strictReason.Contains("Манёвр"),
+                "strict mode explains AP prerequisite with rank/name");
+            var freeHero=new ProgressionService(new HeroProfile{AvailableEssence=20},true);
+            Check(freeHero.Purchase("tactics.action",out _),
+                "free progression buys action point immediately");
+            Check(freeHero.CalculatedStatBonuses()["ActionPoints"]==1f,
+                "AP upgrade contributes to calculated game stat bonus");
+            Check(freeHero.Purchase("forbidden.ghostshot",out _),
+                "free progression allows first weapon-free combat technique");
+            Check(freeHero.Purchase("tactics.action",out _),
+                "AP rank two can be bought");
+            Check(!freeHero.Purchase("tactics.action",out _),
+                "AP rank cap still applies");
+            Check(freeHero.Purchase("forbidden.etherslash",out _),
+                "other special techniques no longer require chains");
+            var poor=new ProgressionService(new HeroProfile{AvailableEssence=1},true);
+            Check(!poor.Purchase("tactics.action",out string priceReason) &&
+                priceReason.Contains("4") && priceReason.Contains("1"),
+                "insufficient essence shows exact required/available points");
             Console.WriteLine("ALL PROGRESSION TESTS PASSED");
         }
         finally
