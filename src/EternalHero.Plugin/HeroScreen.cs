@@ -823,7 +823,10 @@ namespace EternalHero.Plugin
                 "Оригинальные навыки оружия и украшений. Без предметов, XML и слотов инвентаря.");
             Label(rightPane,"ЭССЕНЦИЯ "+profile.AvailableEssence+
                 "  •  ЦЕНА "+ProgressionService.VanillaSkillPrice+
-                "  •  КУПЛЕНО "+(profile.PermanentVanillaSkills?.Count??0)+"/40",
+                "  •  КУПЛЕНО "+(profile.PermanentVanillaSkills?.Count??0)+"/40"+
+                "  •  ВКЛЮЧЕНО "+(profile.PermanentVanillaSkills?.Count(x=>
+                    profile.DisabledVanillaSkills==null ||
+                    !profile.DisabledVanillaSkills.Contains(x))??0),
                 32,106,908,36,19,gold,TextAnchor.MiddleLeft,true);
             Action(rightPane,"LegacyTalents",754,146,200,35,"УЗЛЫ ТЕХНИК",()=>{
                 showLegacyTechniques=true;Rebuild();
@@ -928,13 +931,25 @@ namespace EternalHero.Plugin
                     var entry=found[index];
                     var selection=entry;
                     bool bought=profile.PermanentVanillaSkills.Contains(entry.Id);
+                    bool enabled=bought&&(profile.DisabledVanillaSkills==null ||
+                        !profile.DisabledVanillaSkills.Contains(entry.Id));
                     float x=8+col*457f,y=6+row*rowHeight;
                     var stockTile=Image(content,"Stock-"+entry.Id,x,y,cardWidth,60,card);
-                    Label(stockTile.transform,(bought?"✓ ":"")+entry.Name,8,3,285,26,
-                        17,bought?gold:parchment,TextAnchor.MiddleLeft,true);
-                    string source=entry.Kind+" • "+entry.Source;
-                    if(source.Length>46)source=source.Substring(0,43)+"…";
-                    Label(stockTile.transform,source,8,32,288,23,12,muted);
+                    var iconSprite=GameSkills.Icon(entry.Id);
+                    if(iconSprite!=null)
+                    {
+                        var icon=Image(stockTile.transform,"GameSkillIcon",5,5,49,49,
+                            Color.white,iconSprite);
+                        icon.GetComponent<Image>().preserveAspect=true;
+                        icon.GetComponent<Image>().raycastTarget=false;
+                    }
+                    Label(stockTile.transform,(bought?(enabled?"✓ ":"○ "):"")+entry.Name,
+                        59,3,231,25,16,bought?(enabled?gold:muted):parchment,
+                        TextAnchor.MiddleLeft,true);
+                    string source=entry.Kind+" • "+entry.Source+
+                        (bought?(enabled?" • ВКЛ.":" • ОТКЛ."):"");
+                    if(source.Length>38)source=source.Substring(0,35)+"…";
+                    Label(stockTile.transform,source,59,31,231,22,12,muted);
                     var hover=stockTile.gameObject.AddComponent<EventTrigger>();
                     var enter=new EventTrigger.Entry{eventID=EventTriggerType.PointerEnter};
                     enter.callback.AddListener(_=>{
@@ -953,15 +968,16 @@ namespace EternalHero.Plugin
                         if(vanillaSkillMessage)vanillaSkillMessage.text=vanillaSkillNotice;
                     });
                     hover.triggers.Add(exit);
-                    Action(stockTile.transform,"BuyStock"+entry.Id,298,10,138,41,
-                        bought?"КУПЛЕНО":"КУПИТЬ • 4",()=>{
+                    Action(stockTile.transform,"SkillToggle"+entry.Id,298,10,138,41,
+                        bought?(enabled?"ОТКЛЮЧИТЬ":"ВКЛЮЧИТЬ"):"КУПИТЬ • 4",()=>{
                             if(bought)
-                                vanillaSkillNotice="Навык «"+selection.Name+
-                                    "» уже куплен и сохраняется между забегами.";
-                            else vanillaSkillNotice=GameSkills.Purchase(mod,selection.Id,log);
+                                vanillaSkillNotice=GameSkills.SetEnabled(mod,selection.Id,
+                                    !enabled,log);
+                            else
+                                vanillaSkillNotice=GameSkills.Purchase(mod,selection.Id,log);
                             vanillaSkillScroll=scroller.verticalNormalizedPosition;
                             Rebuild();
-                        },bought);
+                        },bought&&enabled);
                 }
             };
             scroller.onValueChanged.AddListener(_=>{
