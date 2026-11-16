@@ -1,4 +1,4 @@
-name: Build Eternal Hero v0.19
+name: Build Eternal Hero v0.20
 
 on:
   push:
@@ -60,7 +60,12 @@ jobs:
           assert 'GetIconSprite' in skills
           assert 'InstallDamageAdapter(' in skills
           assert 'ResolveOwnedSkillDamage(' in skills
-          assert 'BaseDamageByLevel' in skills
+          assert 'GameBridge.Get(hero,"EquipmentSlots")' in skills
+          assert 'GameBridge.Get(hero,"EquippedWeaponSetIndex")' in skills
+          assert '"RightHand"' in skills
+          assert 'GameBridge.Get(equipped,"BaseDamages")' in skills
+          assert 'return new Vector2(18f,26f)' in skills
+          assert 'ItemDamageBySkill' not in skills
           assert 'RepairZeroBaseDamageRange' in skills
           assert 'ComputeBaseDamageRange' in skills
           assert 'IsOurActiveNativeSkill' in skills
@@ -86,6 +91,6 @@ jobs:
           cp docs/INSTALL.md package/INSTALL.md
       - uses: actions/upload-artifact@v4
         with:
-          name: EternalHero-v0.19
+          name: EternalHero-v0.20
           path: package/
           if-no-files-found: error
