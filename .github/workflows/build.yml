@@ -78,7 +78,7 @@ jobs:
           assert 'damage hooks: BaseDamage=' in skills
           assert 'if(__result.x>0.001f || __result.y>0.001f)return;' not in skills
           assert 'normal game damage modifiers' not in skills or 'vanilla damage modifiers' in skills
-          assert 'new Vector2Int(lo,hi)' in skills
+          assert 'new Vector2Int(lower,upper)' in skills
           assert 'LogInfo("Eternal Hero: purchased attack floor applied' in skills
           assert 'SkillContainer' in skills
           plugin=Path('src/EternalHero.Plugin/Plugin.cs').read_text()
