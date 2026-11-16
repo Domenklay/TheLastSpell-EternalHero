@@ -14,7 +14,7 @@ namespace EternalHero.Plugin
     public sealed class Plugin : BaseUnityPlugin
     {
         internal const string Id = "domenklay.tls.eternalhero";
-        internal const string Version = "0.10.0";
+        internal const string Version = "0.11.0";
 
         private Harmony harmony;
         private ProfileStore store;
@@ -59,6 +59,11 @@ namespace EternalHero.Plugin
                 store = new ProfileStore(Path.Combine(Paths.ConfigPath, "EternalHero", "profile.json"));
                 progression = new ProgressionService(store.Load());
                 runRewards = new RunRewards(progression);
+                int legacyCompensation = runRewards.CompensateEarlyEconomy();
+                if (legacyCompensation>0)
+                    Logger.LogInfo("Eternal Hero: economy v0.11 compensation awarded "
+                        + legacyCompensation + " essence to previous run profile.");
+                store.Save(Profile);
                 // One free point for initial testing, once per profile. Old v0.3 gift won't be doubled.
                 if (!Profile.StarterEssenceGranted)
                 {
@@ -75,6 +80,7 @@ namespace EternalHero.Plugin
                 harmony = new Harmony(Id);
                 RacialPenaltyGuard.Install(harmony, Logger);
                 GamePerks.Install(harmony, Logger);
+                LastStandGuard.Install(harmony, Logger);
                 var start = AccessTools.Method("TheLastStand.Manager.Unit.PlayableUnitManager:CreateStartUnits");
                 if (start != null)
                 {
@@ -101,6 +107,22 @@ namespace EternalHero.Plugin
                     Logger.LogInfo("Eternal Hero night XP hook installed.");
                 }
 
+                var over = AccessTools.Method("TheLastStand.Controller.GameController:TriggerGameOver");
+                if(over!=null)
+                {
+                    harmony.Patch(over,postfix:new HarmonyMethod(AccessTools.Method(
+                        typeof(Plugin),nameof(AfterGameOver))));
+                    Logger.LogInfo("Eternal Hero: final map completion/reward hook installed");
+                }
+                else Logger.LogWarning("Eternal Hero: game-over reward hook unavailable.");
+
+                var boss = AccessTools.Method("TheLastStand.Manager.Unit.BossManager:HandleBossPhaseActorDeath");
+                if(boss!=null)
+                {
+                    harmony.Patch(boss,postfix:new HarmonyMethod(AccessTools.Method(
+                        typeof(Plugin),nameof(AfterBossPhaseDeath))));
+                    Logger.LogInfo("Eternal Hero: boss victory reward hook installed");
+                }
                 var customization = AccessTools.Method(
                     "TheLastStand.View.PlayableUnitCustomisation.PlayableUnitCustomisationPanel:OnConfirmButtonClicked");
                 if (customization != null)
@@ -223,6 +245,59 @@ namespace EternalHero.Plugin
         private static void AfterNightExperience()
         {
             if (Instance != null) Instance.RewardCompletedNight();
+        }
+
+        private static void AfterGameOver(object __0)
+        {
+            var instance=Instance;
+            if(instance==null || instance.Profile==null) return;
+            string cause=__0?.ToString()??"";
+            if(cause=="Abandon") return; // abandoning a run is not a defeat to farm
+            bool victory=cause=="MagicSealsCompleted";
+            instance.RewardRunEnd(victory,cause);
+        }
+
+        private void RewardRunEnd(bool victory,string cause)
+        {
+            try
+            {
+                if(runRewards==null||Profile==null||Profile.RunFinished) return;
+                SnapshotCurrentCareer();
+                long before=Profile.EarnedEssence;
+                if(!runRewards.Finish(victory)) return;
+                int bonus=(int)(Profile.EarnedEssence-before);
+                SaveProfile();
+                Logger.LogInfo("Eternal Hero: finished map; cause="+cause+
+                    " awarded +"+bonus+" essence; total="+Profile.AvailableEssence);
+                screen?.Notify((victory?"ПОБЕДА":"ЗАВЕРШЕНИЕ ЗАБЕГА")+
+                    " • +"+bonus+" эссенции");
+            }
+            catch(Exception e){Logger.LogError("Eternal Hero finish reward: "+e);}
+        }
+
+        private static void AfterBossPhaseDeath(object __instance)
+        {
+            var instance=Instance;
+            if(instance==null||instance.Profile==null||instance.Profile.RunFinished)return;
+            try
+            {
+                if(!(GameBridge.Get(__instance,"IsBossVanquished") is bool killed)||!killed)return;
+                string phase=GameBridge.Get(__instance,"CurrentBossPhaseId")?.ToString();
+                var gameManager=GameBridge.Singleton("TheLastStand.Manager.GameManager");
+                int day=Convert.ToInt32(GameBridge.Get(GameBridge.Get(gameManager,"Game"),"DayNumber")??0);
+                if(string.IsNullOrWhiteSpace(phase)) phase="boss";
+                string id=day+":"+phase;
+                long before=instance.Profile.EarnedEssence;
+                if(instance.runRewards.BossDefeated(id))
+                {
+                    int awarded=(int)(instance.Profile.EarnedEssence-before);
+                    instance.SaveProfile();
+                    instance.Logger.LogInfo("Eternal Hero boss phase cleared "+id+
+                        ", essence +"+awarded);
+                    instance.screen?.Notify("БОСС ПОВЕРЖЕН • +"+awarded+" эссенции");
+                }
+            }
+            catch(Exception e){instance.Logger.LogWarning("Eternal Hero boss reward: "+e.Message);}
         }
 
         private void RewardCompletedNight()
