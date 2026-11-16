@@ -19,6 +19,7 @@ namespace EternalHero.Core
         [DataMember] public bool CreationConfirmed { get; set; }
         [DataMember] public List<string> SelectedTraits { get; set; } = new List<string>();
         [DataMember] public List<string> SelectedPerks { get; set; } = new List<string>();
+        [DataMember] public List<string> PermanentVanillaSkills { get; set; } = new List<string>();
         // The separate personal-achievement history is monotonic across runs.
         [DataMember] public Dictionary<string, double> CareerLifetimeStats { get; set; } =
             new Dictionary<string, double>();
@@ -207,10 +208,42 @@ namespace EternalHero.Core
             if (profile.ClaimedRewardIds == null) profile.ClaimedRewardIds = new HashSet<string>();
             if (profile.SelectedTraits == null) profile.SelectedTraits = new List<string>();
             if (profile.SelectedPerks == null) profile.SelectedPerks = new List<string>();
+            if (profile.PermanentVanillaSkills == null) profile.PermanentVanillaSkills = new List<string>();
             if (profile.CareerLifetimeStats == null) profile.CareerLifetimeStats = new Dictionary<string, double>();
             if (profile.CareerLifetimeDetails == null)
                 profile.CareerLifetimeDetails = new Dictionary<string, Dictionary<string, double>>();
             if (profile.Appearance == null) profile.Appearance = new Dictionary<string, string>();
+        }
+
+        public const int VanillaSkillPrice = 4;
+        public bool PurchaseVanillaSkill(string id,out string reason)
+        {
+            reason=null;
+            if(string.IsNullOrWhiteSpace(id))
+            {reason="Не выбрана способность";return false;}
+            if(Profile.PermanentVanillaSkills.Contains(id))
+            {reason="Уже приобретено";return false;}
+            if(Profile.PermanentVanillaSkills.Count>=40)
+            {reason="Достигнут лимит 40 постоянных навыков";return false;}
+            if(Profile.AvailableEssence<VanillaSkillPrice)
+            {reason="Нужно "+VanillaSkillPrice+" эссенции, доступно "+Profile.AvailableEssence;return false;}
+            Profile.AvailableEssence-=VanillaSkillPrice;
+            Profile.PermanentVanillaSkills.Add(id);
+            return true;
+        }
+
+        public int RefundOldUnusableTechniques()
+        {
+            const string key="migration:vanilla-skills-v0.15";
+            if(Profile.ClaimedRewardIds.Contains(key))return 0;
+            string[] old={"forbidden.ghostshot","forbidden.etherslash",
+                "forbidden.arcaneburst","forbidden.secondshot","trinity.hunter",
+                "trinity.mage","tactics.teleport"};
+            int purchases=old.Count(id=>Rank(id)>0);
+            int credit=checked(purchases*5);
+            Profile.AvailableEssence=checked(Profile.AvailableEssence+credit);
+            Profile.ClaimedRewardIds.Add(key);
+            return credit;
         }
 
         public int TotalUpgradeRanks => UpgradeCatalog.All.Sum(x => x.MaxRank);
