@@ -971,9 +971,6 @@ namespace EternalHero.Plugin
                 service.IgnorePrerequisites ?
                     "Свободная прокачка: предыдущие узлы не требуются. Нужна только эссенция.":
                     "Строгая прокачка: отдельным узлам нужны предшествующие таланты.");
-            if(special)
-                Action(rightPane,"ReturnStockSkills",754,650,200,38,
-                    "АРСЕНАЛ ГЕРОЯ",()=>{showLegacyTechniques=false;Rebuild();});
             Label(rightPane, "МЕТАРАНГ " + service.MetaRank + "/100   •   ЭССЕНЦИЯ " +
                 p.AvailableEssence + "   •   УЗЛЫ " + service.PurchasedUpgradeRanks +
                 "/" + service.TotalUpgradeRanks, 29,109,921,34,19,gold,TextAnchor.MiddleLeft,true);
@@ -1058,18 +1055,11 @@ namespace EternalHero.Plugin
                 30,610,920,31,17,parchment);
             if(special)
             {
-                Label(rightPane,GameSkills.Diagnostic(mod.CurrentHero,p),
-                    30,645,661,46,16,parchment,TextAnchor.UpperLeft);
-                Action(rightPane,"SyncSkills",710,645,242,45,"ВЫДАТЬ УМЕНИЯ",()=>{
-                    if(mod.CurrentHero==null)
-                        status="Нужно начать забег: герой пока не создан.";
-                    else
-                    {
-                        status=GameSkills.Grant(mod.CurrentHero,p,log);
-                        GameSkills.Synchronize(mod.CurrentHero,p,log);
-                    }
-                    Rebuild();
-                },true);
+                Label(rightPane,"Старые метаузлы сохранены. Для покупки настоящих навыков"+
+                    " оружия и украшений открой Арсенал.",
+                    30,643,661,48,15,parchment,TextAnchor.UpperLeft);
+                Action(rightPane,"ReturnStockSkills",710,645,242,45,
+                    "АРСЕНАЛ ГЕРОЯ",()=>{showLegacyTechniques=false;Rebuild();},true);
             }
             else Label(rightPane,string.IsNullOrWhiteSpace(status) ?
                 "Нажми на недоступную кнопку, чтобы увидеть точную причину." :
