@@ -52,13 +52,17 @@ namespace EternalHero.Plugin
         // The native skill bar caches its button list. Changing NativeSkills alone
         // does not invalidate that cache; the same Refresh(true) call the game uses
         // when a unit learns a perk is required.
-        private static void RefreshNativeSkillUI(object hero, ManualLogSource log)
+        private static object lastRefreshedHero;
+        private static object lastRefreshedBar;
+        private static bool pendingRefresh;
+
+        private static bool RefreshNativeSkillUI(object hero, ManualLogSource log)
         {
             try
             {
                 object selected=GameBridge.StaticGet(
                     "TheLastStand.Manager.TileObjectSelectionManager","SelectedPlayableUnit");
-                if(!ReferenceEquals(selected,hero)) return;
+                if(!ReferenceEquals(selected,hero)) return false;
                 object ui=GameBridge.Singleton(
                     "TheLastStand.View.HUD.UnitManagement.PlayableUnitManagementView");
                 object bar=GameBridge.Get(ui,"PlayableSkillBar");
@@ -66,13 +70,23 @@ namespace EternalHero.Plugin
                 if(method!=null)
                 {
                     method.Invoke(bar,new object[]{true});
+                    lastRefreshedHero=hero;
+                    lastRefreshedBar=bar;
+                    pendingRefresh=false;
                     log.LogInfo("Eternal Hero: native scroll-like skill bar rebuilt (no inventory item)");
                 }
-                else log.LogWarning("Eternal Hero: PlayableSkillBar.Refresh(true) unavailable");
+                else
+                {
+                    pendingRefresh=true;
+                    log.LogInfo("Eternal Hero: PlayableSkillBar not ready; refresh deferred");
+                    return false;
+                }
             }
             catch(Exception e)
             {
+                pendingRefresh=true;
                 log.LogWarning("Eternal Hero skill bar refresh: "+e.GetBaseException().Message);
+                return false;
             }
             try
             {
@@ -86,6 +100,27 @@ namespace EternalHero.Plugin
             {
                 log.LogInfo("Eternal Hero character sheet refresh deferred: "+e.GetBaseException().Message);
             }
+            return true;
+        }
+
+        internal static void Synchronize(object hero, HeroProfile profile, ManualLogSource log)
+        {
+            if(hero==null||profile==null||!Tracks.Any(t=>Rank(profile,t.Unlock)>0)) return;
+            if(NeedsSync(hero,profile))
+            {
+                log.LogInfo("Eternal Hero: resyncing learned techniques after late game/ModKit load");
+                Grant(hero,profile,log);
+            }
+            object selected=GameBridge.StaticGet(
+                "TheLastStand.Manager.TileObjectSelectionManager","SelectedPlayableUnit");
+            if(!ReferenceEquals(selected,hero)) return;
+            object ui=GameBridge.Singleton(
+                "TheLastStand.View.HUD.UnitManagement.PlayableUnitManagementView");
+            object bar=GameBridge.Get(ui,"PlayableSkillBar");
+            if(bar!=null &&
+                (pendingRefresh||!ReferenceEquals(lastRefreshedHero,hero)||
+                 !ReferenceEquals(lastRefreshedBar,bar)))
+                RefreshNativeSkillUI(hero,log);
         }
 
         // A late TLS.ModKit load or a new scene must not leave acquired skills
@@ -199,7 +234,12 @@ namespace EternalHero.Plugin
                     missing++;
                 }
             }
-            if(equipped>0 || removed>0) RefreshNativeSkillUI(hero,log);
+            if(equipped>0 || removed>0)
+            {
+                pendingRefresh=true;
+                RefreshNativeSkillUI(hero,log);
+            }
+            else if(pendingRefresh) RefreshNativeSkillUI(hero,log);
             if(missing>0)
                 log.LogWarning("Eternal Hero: "+missing+
                     " learned skills missing, check ModKit [Skills] parse logs.");
