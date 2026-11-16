@@ -14,7 +14,7 @@ namespace EternalHero.Plugin
     public sealed class Plugin : BaseUnityPlugin
     {
         internal const string Id = "domenklay.tls.eternalhero";
-        internal const string Version = "0.18.0";
+        internal const string Version = "0.19.0";
 
         private Harmony harmony;
         private ProfileStore store;
