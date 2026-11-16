@@ -6,6 +6,7 @@ using System.Reflection;
 using BepInEx.Logging;
 using EternalHero.Core;
 using HarmonyLib;
+using UnityEngine;
 
 namespace EternalHero.Plugin
 {
@@ -23,6 +24,8 @@ namespace EternalHero.Plugin
         }
 
         private static object lastBar,lastHero;
+        private static readonly Dictionary<string,Sprite> IconCache=
+            new Dictionary<string,Sprite>(StringComparer.Ordinal);
         private static bool refreshPending;
         private static readonly string[] Groups={
             "БЛИЖНИЙ БОЙ","СТРЕЛЬБА","МАГИЯ","УКРАШЕНИЯ"
@@ -88,6 +91,43 @@ namespace EternalHero.Plugin
                 .ThenBy(x=>x.Name,StringComparer.CurrentCultureIgnoreCase).ToList();
         }
 
+        // Reuse exactly the icon requested by the game's SkillDisplay.RefreshIcon:
+        // SkillView.GetIconSprite(skillDefinition.ArtId).
+        internal static Sprite Icon(string id)
+        {
+            if(string.IsNullOrWhiteSpace(id))return null;
+            try
+            {
+                var db=GameBridge.StaticGet(SkillDb,"SkillDefinitions") as IDictionary;
+                if(db==null || !db.Contains(id))return null;
+                string art=GameBridge.Get(db[id],"ArtId")?.ToString();
+                if(string.IsNullOrWhiteSpace(art))art=id;
+                if(IconCache.TryGetValue(art,out Sprite cached))return cached;
+                var view=AccessTools.TypeByName("TheLastStand.View.Skill.SkillView");
+                var method=view?.GetMethod("GetIconSprite",
+                    BindingFlags.Public|BindingFlags.Static,null,new[]{typeof(string)},null);
+                Sprite sprite=method?.Invoke(null,new object[]{art}) as Sprite;
+                IconCache[art]=sprite;
+                return sprite;
+            }
+            catch{return null;}
+        }
+
+        internal static string SetEnabled(Plugin plugin,string id,bool enabled,ManualLogSource log)
+        {
+            if(!plugin.Progression.SetVanillaSkillEnabled(id,enabled,out string error))
+                return error;
+            plugin.SaveProfile();
+            if(plugin.CurrentHero!=null)
+            {
+                string result=Grant(plugin.CurrentHero,plugin.Profile,log);
+                Synchronize(plugin.CurrentHero,plugin.Profile,log);
+                log.LogInfo("Eternal Hero skill "+id+" enabled="+enabled+": "+result);
+            }
+            return enabled?"Включено: навык снова доступен герою":
+                "Отключено: покупка сохранена, навык скрыт с боевой панели";
+        }
+
         internal static string Purchase(Plugin plugin,string id,ManualLogSource log)
         {
             var skill=Available().FirstOrDefault(s=>s.Id==id);
@@ -116,8 +156,10 @@ namespace EternalHero.Plugin
             if(native.Cast<object>().Any(x=>
                 (GameBridge.Get(GameBridge.Get(x,"SkillDefinition"),"Id")?.ToString()??"")
                     .StartsWith("Eternal",StringComparison.Ordinal)))return true;
+            var disabled=new HashSet<string>(
+                profile.DisabledVanillaSkills??new List<string>(),StringComparer.Ordinal);
             return (profile.PermanentVanillaSkills??new List<string>())
-                .Any(id=>!IsGranted(native,id));
+                .Any(id=>disabled.Contains(id)?IsGranted(native,id):!IsGranted(native,id));
         }
 
         private static void RefreshBar(object hero,ManualLogSource log)
@@ -156,12 +198,30 @@ namespace EternalHero.Plugin
                 if(id!=null&&id.StartsWith("Eternal",StringComparison.Ordinal))
                 { native.RemoveAt(i);removed++; }
             }
+            // Only purchased skills can be toggled; never mutate unrelated inventory,
+            // equipment, scrolls or the built-in roster of the other characters.
+            var disabled=new HashSet<string>(
+                profile.DisabledVanillaSkills??new List<string>(),StringComparer.Ordinal);
+            foreach(string id in disabled)
+            {
+                if(profile.PermanentVanillaSkills==null ||
+                    !profile.PermanentVanillaSkills.Contains(id))continue;
+                for(int i=native.Count-1;i>=0;i--)
+                {
+                    string existingId=GameBridge.Get(
+                        GameBridge.Get(native[i],"SkillDefinition"),"Id")?.ToString();
+                    if(existingId!=id)continue;
+                    native.RemoveAt(i);
+                    removed++;
+                    log.LogInfo("Eternal Hero: skill disabled from NativeSkills "+id);
+                }
+            }
             var controllerType=AccessTools.TypeByName("TheLastStand.Controller.Skill.SkillController");
             if(controllerType==null)return "Невозможно найти игровой SkillController";
             var allowed=new HashSet<string>(Available().Select(x=>x.Id),StringComparer.Ordinal);
             foreach(string id in (profile.PermanentVanillaSkills??new List<string>()).Distinct())
             {
-                if(IsGranted(native,id))continue;
+                if(disabled.Contains(id) || IsGranted(native,id))continue;
                 if(!db.Contains(id)||!allowed.Contains(id))
                 {unavailable++;log.LogWarning("Eternal Hero stock skill not found: "+id);continue;}
                 try
@@ -208,10 +268,14 @@ namespace EternalHero.Plugin
         {
             int purchased=profile?.PermanentVanillaSkills?.Count??0;
             var native=GameBridge.Get(hero,"NativeSkills") as IList;
+            int enabled=(profile?.PermanentVanillaSkills??new List<string>())
+                .Count(id=>profile?.DisabledVanillaSkills==null||
+                    !profile.DisabledVanillaSkills.Contains(id));
             int actual=(profile?.PermanentVanillaSkills??new List<string>())
                 .Count(id=>IsGranted(native,id));
             return "Штатные навыки: "+Available().Count+
-                " • куплено "+purchased+" • выдано ГГ "+actual;
+                " • куплено "+purchased+" • включено "+enabled+
+                " • выдано ГГ "+actual;
         }
 
         internal static string Status(object hero,HeroProfile profile)
