@@ -204,10 +204,30 @@ namespace EternalHero.Plugin
                         if (diff <= .001f) continue;
                         object numeric = args[1].ParameterType == typeof(int) ?
                             (object)Convert.ToInt32(diff) : diff;
-                        method.Invoke(controller, new object[] {
+                        object result = method.Invoke(controller, new object[] {
                             Enum.Parse(enumType, gameName), numeric, false, true
                         });
-                        already[kv.Key] = kv.Value;
+                        float actual = result == null ? diff : Convert.ToSingle(result);
+                        if(actual<=.001f)
+                        {
+                            log.LogWarning("Eternal Hero stat capped: "+gameName+
+                                " requested="+diff+" applied="+actual);
+                            continue;
+                        }
+                        already[kv.Key] = applied + actual;
+                        if(kv.Key=="ActionPoints" || kv.Key=="MovePoints")
+                        {
+                            string name=kv.Key=="ActionPoints"?"ActionPoints":"MovePoints";
+                            if(Enum.IsDefined(enumType,name))
+                                method.Invoke(controller,new object[]{
+                                    Enum.Parse(enumType,name),
+                                    args[1].ParameterType==typeof(int)
+                                        ?(object)Convert.ToInt32(actual):actual,
+                                    false,true
+                                });
+                        }
+                        log.LogInfo("Eternal Hero stat applied: "+gameName+
+                            " +"+actual+" / requested "+diff);
                         changed++;
                     }
                     catch (Exception e)
