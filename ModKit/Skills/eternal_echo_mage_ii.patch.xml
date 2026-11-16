@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Patch target="SkillDefinition" action="add" id="EternalEchoMageII">
+  <Definition>
+    <SkillDefinition Id="EternalEchoMageII">
+      <OverrideArtId>Slice</OverrideArtId>
+      <ActionPointsCost>0</ActionPointsCost>
+      <ManaCost>0</ManaCost>
+      <UsesPerTurnCount>1</UsesPerTurnCount>
+      <Range Min="1" Max="4" Modifiable="true"/>
+      <AreaOfEffect OriginX="1" OriginY="1">
+        XXX
+        XXX
+        XXX
+      </AreaOfEffect>
+      <SkillAction>
+        <Attack>
+          <AttackType>Magical</AttackType>
+          <DamageMultiplier>1.25</DamageMultiplier>
+        </Attack>
+      </SkillAction>
+      <CastFXs TotalDuration="0.85">
+        <VisualEffect>
+          <Paths>
+            <Path Orientation="NSEW">DruidicStaff/Lightning Strike/LightningStrike_ThunderNSEW</Path>
+          </Paths>
+          <SortingDepth>Before</SortingDepth>
+          <Target>HitTiles</Target>
+          <Delay>0.55</Delay>
+        </VisualEffect>
+        <SoundEffect>
+          <Path>TomeOfMagic/LightningStrike/SFX_Skill_TomeOfMagic_LightningStrike</Path>
+          <Delay>0.25</Delay>
+        </SoundEffect>
+      </CastFXs>
+    </SkillDefinition>
+  </Definition>
+</Patch>
