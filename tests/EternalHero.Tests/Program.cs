@@ -161,6 +161,49 @@ internal static class Program
             var mixed = TraitBrowser.CategoriesFor(new[]{"CriticalDamage"});
             Check(mixed.Contains("УРОН") && mixed.Contains("ТОЧНОСТЬ"),
                 "critical damage may appear in both relevant categories");
+            var oldEconomyProfile=new HeroProfile {
+                CurrentRunId="old-run",RunsStarted=1,TotalNightsSurvived=2
+            };
+            var oldEconomy=new ProgressionService(oldEconomyProfile);
+            oldEconomy.GrantExperience("old:gift",200);
+            oldEconomy.GrantExperience("run:old-run:night:1",35);
+            oldEconomy.GrantExperience("run:old-run:night:2",40);
+            var oldRewards=new RunRewards(oldEconomy);
+            int migration=oldRewards.CompensateEarlyEconomy();
+            Check(migration>=9 && oldEconomyProfile.AvailableEssence>=11,
+                "old low-value nights and early player grant are compensated");
+            Check(oldRewards.CompensateEarlyEconomy()==0,
+                "repeated migration never double-pays");
+            var freshProfile=new HeroProfile();
+            var freshRewards=new RunRewards(new ProgressionService(freshProfile));
+            Check(freshRewards.CompensateEarlyEconomy()==0,
+                "fresh profile has no retroactive bonus");
+            freshRewards.Begin("new-run");
+            Check(freshRewards.NightSurvived(1),"new economy grants night rewards");
+            Check(freshRewards.CompensateEarlyEconomy()==0,
+                "new players cannot claim old economy compensation");
+            int newNightEssence=freshProfile.AvailableEssence;
+            Check(newNightEssence>=1,"surviving a night grants substantial essence");
+            Check(freshRewards.Finish(true),"new economy awards map victory");
+            Check(freshProfile.AvailableEssence-newNightEssence>=11,
+                "first clear grants victory essence plus one-time first-clear reward");
+            Check(!freshRewards.Finish(true),"victory reward remains idempotent");
+            freshRewards.Begin("next-run");
+            Check(freshRewards.Finish(false),"defeat consolation is awarded");
+            Check(freshProfile.Victories==1 && freshProfile.Defeats==1,
+                "run win and loss counters survive new payout model");
+            var legacySoul=new HeroProfile{CurrentRunId="guard-run"};
+            legacySoul.Ranks["body.laststand"]=1;
+            Check(LastStandPolicy.TryConsume(legacySoul,2,30,40,true),
+                "one rescue on lethal hit at night");
+            Check(!LastStandPolicy.TryConsume(legacySoul,2,30,40,true),
+                "rescue cannot retrigger in same night");
+            Check(!LastStandPolicy.TryConsume(legacySoul,3,30,40,false),
+                "rescue disabled outside night");
+            Check(LastStandPolicy.TryConsume(legacySoul,3,30,40,true),
+                "rescue refreshes on a different night");
+            Check(LastStandPolicy.MinimumRecovery(200)==60,
+                "rescue restores 30% health");
             Console.WriteLine("ALL PROGRESSION TESTS PASSED");
         }
         finally

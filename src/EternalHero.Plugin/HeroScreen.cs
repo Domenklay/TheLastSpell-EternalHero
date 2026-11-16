@@ -851,7 +851,7 @@ namespace EternalHero.Plugin
                 " улучшений • "+(service.Completion*100f).ToString("0.0")+"%",
                 30,610,920,31,17,parchment);
             Label(rightPane,special ?
-                "Эхо охотника и эхо мага дают дополнительные атаки без затрат основных очков действий. Нужен TLS.ModKit." :
+                "Техники усиливаются от рангов мастерства, а Эфирный шаг доступен без оружия. Нужен TLS.ModKit." :
                 "При полной прокачке всех шести веток откроется бесконечное Возвышение.",
                 30,645,915,46,16,muted,TextAnchor.UpperLeft);
         }
@@ -958,7 +958,10 @@ namespace EternalHero.Plugin
             Action(rightPane,"Reload",513,552,441,56,"ПРОВЕРИТЬ ИНТЕГРАЦИЮ",()=>{
                 mod.ApplyCurrentHero();Notify("Выполнена попытка синхронизации героя");
             });
-            Label(rightPane,"Подробная диагностика: BepInEx/LogOutput.log",36,634,917,40,16,muted);
+            Label(rightPane,"Боевые навыки: "+GameSkills.Status(mod.CurrentHero,p),
+                36,613,917,57,14,parchment,TextAnchor.UpperLeft);
+            Label(rightPane,"Подробная диагностика: BepInEx/LogOutput.log",
+                36,672,917,22,14,muted);
         }
     }
 }
