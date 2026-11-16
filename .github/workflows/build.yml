@@ -1,4 +1,4 @@
-name: Build Eternal Hero v0.10
+name: Build Eternal Hero v0.11
 
 on:
   push:
@@ -30,9 +30,18 @@ jobs:
               inner=root.find('./Definition/SkillDefinition')
               assert inner is not None and inner.attrib['Id']==root.attrib['id']
               ids.add(inner.attrib['Id'])
-          assert ids=={'EternalGhostShot','EternalEtherSlash','EternalArcanePulse',
-                        'EternalEchoHunter','EternalEchoMage','EternalSecondShot'}, ids
-          print('All special skill XML patches are valid')
+          base={'EternalGhostShot','EternalEtherSlash','EternalArcanePulse',
+                'EternalEchoHunter','EternalEchoMage','EternalSecondShot'}
+          mastered={f'{name}{rank}' for name in ['EternalGhostShot','EternalEtherSlash','EternalArcanePulse']
+                    for rank in ['III','V']}
+          echoes={'EternalEchoHunterII','EternalEchoMageII','EternalSecondShotII'}
+          expected=base | mastered | echoes | {'EternalTeleport'}
+          assert ids==expected, (sorted(ids), sorted(expected-ids))
+          tele=ET.parse('ModKit/Skills/eternal_teleport.patch.xml').getroot()
+          assert tele.find('.//AreaOfEffect').text.strip()=='M'
+          assert tele.find('.//Maneuver') is not None
+          assert tele.find('.//Generic') is not None
+          print('All 16 special skill XML patches are structurally valid')
           PY
       - name: Package prototype DLLs
         shell: bash
@@ -45,9 +54,9 @@ jobs:
           cp ModKit/Skills/*.patch.xml package/BepInEx/plugins/EternalHero/ModKit/Skills/
           cp ModKit/languages.csv package/BepInEx/plugins/EternalHero/ModKit/
           cd package
-          zip -r ../EternalHero-v0.10.zip BepInEx INSTALL.md
+          zip -r ../EternalHero-v0.11.zip BepInEx INSTALL.md
       - uses: actions/upload-artifact@v4
         with:
-          name: EternalHero-v0.10
-          path: EternalHero-v0.10.zip
+          name: EternalHero-v0.11
+          path: EternalHero-v0.11.zip
           if-no-files-found: error
