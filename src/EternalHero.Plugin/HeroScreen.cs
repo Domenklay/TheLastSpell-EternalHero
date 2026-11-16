@@ -763,7 +763,10 @@ namespace EternalHero.Plugin
                         {
                             string description=string.IsNullOrWhiteSpace(target.Description)
                                 ?"Описание отсутствует":target.Description;
-                            traitDetailLabel.text=target.Name+" — "+description;
+                            string state=choosePerks&&!perkRunMode
+                                ? "\nСостояние: "+GamePerks.RuntimeState(mod.CurrentHero,target.Id)
+                                : "";
+                            traitDetailLabel.text=target.Name+" — "+description+state;
                         }
                     });
                     hover.triggers.Add(enter);
@@ -943,15 +946,14 @@ namespace EternalHero.Plugin
                 DrawVanillaSkillLibrary(p);
                 return;
             }
-            if(special)
-                Action(rightPane,"ReturnStockSkills",751,113,211,37,
-                    "ИГРОВЫЕ НАВЫКИ",()=>{showLegacyTechniques=false;Rebuild();});
-
             var service = mod.Progression;
             FrameHeader(special ? "ЗАПРЕТНЫЕ ТЕХНИКИ И ЭХА" : "НАСЛЕДИЕ ГЕРОЯ",
                 service.IgnorePrerequisites ?
                     "Свободная прокачка: предыдущие узлы не требуются. Нужна только эссенция.":
                     "Строгая прокачка: отдельным узлам нужны предшествующие таланты.");
+            if(special)
+                Action(rightPane,"ReturnStockSkills",754,650,200,38,
+                    "АРСЕНАЛ ГЕРОЯ",()=>{showLegacyTechniques=false;Rebuild();});
             Label(rightPane, "МЕТАРАНГ " + service.MetaRank + "/100   •   ЭССЕНЦИЯ " +
                 p.AvailableEssence + "   •   УЗЛЫ " + service.PurchasedUpgradeRanks +
                 "/" + service.TotalUpgradeRanks, 29,109,921,34,19,gold,TextAnchor.MiddleLeft,true);
