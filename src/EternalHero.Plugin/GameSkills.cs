@@ -24,9 +24,7 @@ namespace EternalHero.Plugin
         }
 
         private static object lastBar,lastHero;
-        private static readonly Dictionary<string,Vector2> ItemDamageBySkill=
-            new Dictionary<string,Vector2>(StringComparer.Ordinal);
-        private static readonly HashSet<string> WarnedMissingItemDamage=
+        private static readonly HashSet<string> WarnedEmptyWeaponSlot=
             new HashSet<string>(StringComparer.Ordinal);
         private static ManualLogSource combatLog;
         private static readonly HashSet<string> LoggedDamageFallback=
@@ -36,8 +34,8 @@ namespace EternalHero.Plugin
 
         // The original game's AttackSkillAction.BaseDamage uses
         // Skill.SkillContainer as an Item to read Item.BaseDamages.
-        // Our skills intentionally have a PlayableUnit container instead.
-        // Supply their real source item's damage without equipping anything.
+        // Our purchased abilities live directly on the PlayableUnit. Feed
+        // them the equipped primary-hand weapon's damage instead.
         internal static void InstallDamageAdapter(Harmony harmony,ManualLogSource log)
         {
             combatLog=log;
@@ -84,25 +82,49 @@ namespace EternalHero.Plugin
                  !profile.DisabledVanillaSkills.Contains(id));
         }
 
+        // RightHand is the FIRST weapon slot in the currently active set.
+        // The Last Spell stores weapon sets at indices 0 and 1; each slot
+        // contains an ItemSlot.Item with its real Level-adjusted BaseDamages.
+        // Never cache damage: swapping weapon sets or changing equipment must
+        // immediately update previews and attacks.
         private static Vector2 GetSourceDamage(string id)
         {
-            // The catalogue is populated from original item definitions. Retry
-            // once when definitions became available after plugin startup.
-            if(ItemDamageBySkill.Count==0||!ItemDamageBySkill.ContainsKey(id))
-                Available();
-            if(ItemDamageBySkill.TryGetValue(id,out Vector2 found)&&found.y>0f)
+            object hero=Plugin.Instance?.CurrentHero;
+            var slots=GameBridge.Get(hero,"EquipmentSlots") as IDictionary;
+            if(slots!=null)
             {
-                if(LoggedDamageSources.Add(id))
-                    combatLog?.LogInfo("Eternal Hero: "+id+" source weapon base damage "+
-                        found.x+"–"+found.y);
-                return found;
+                foreach(DictionaryEntry slotGroup in slots)
+                {
+                    if(!string.Equals(slotGroup.Key?.ToString(),"RightHand",
+                        StringComparison.Ordinal))continue;
+                    var handSlots=slotGroup.Value as IList;
+                    int setIndex=0;
+                    try
+                    {
+                        setIndex=Convert.ToInt32(
+                            GameBridge.Get(hero,"EquippedWeaponSetIndex")??0);
+                    }
+                    catch{ }
+                    if(handSlots!=null && setIndex>=0 && setIndex<handSlots.Count)
+                    {
+                        object equipped=GameBridge.Get(handSlots[setIndex],"Item");
+                        object raw=GameBridge.Get(equipped,"BaseDamages");
+                        if(raw is Vector2 baseDamage && baseDamage.y>0f)
+                        {
+                            string key=id+":"+setIndex+":"+baseDamage.x+":"+baseDamage.y;
+                            if(LoggedDamageSources.Add(key))
+                                combatLog?.LogInfo("Eternal Hero first weapon slot: "+
+                                    id+" from active weapon set "+setIndex+
+                                    ", base damage "+baseDamage.x+"–"+baseDamage.y);
+                            return baseDamage;
+                        }
+                    }
+                    break;
+                }
             }
-            if(WarnedMissingItemDamage.Add(id))
-                combatLog?.LogWarning("Eternal Hero: no positive original item base damage for "+
-                    id+"; using conservative virtual-weapon base 18–26");
-            // Some trinket-sourced attack skills have no item weapon damage.
-            // A modest innate base is required while preserving the vanilla
-            // skill's action costs, area, multipliers and effects.
+            if(WarnedEmptyWeaponSlot.Add(id))
+                combatLog?.LogInfo("Eternal Hero: first weapon slot empty "+
+                    "or has no base damage for "+id+"; using unarmed 18–26");
             return new Vector2(18f,26f);
         }
 
@@ -173,7 +195,6 @@ namespace EternalHero.Plugin
                 if(string.IsNullOrWhiteSpace(source)) source=item.Key?.ToString();
                 var byLevel=GameBridge.Get(definition,"SkillsByLevel") as IDictionary;
                 if(byLevel==null)continue;
-                var itemBaseDamage=GameBridge.Get(definition,"BaseDamageByLevel") as IDictionary;
                 foreach(DictionaryEntry level in byLevel)
                 {
                     var skills=level.Value as IDictionary;
@@ -185,16 +206,6 @@ namespace EternalHero.Plugin
                         object skill=definitions[id];
                         if(GameBridge.Get(skill,"IsContextual") is bool contextual && contextual)continue;
                         if(GameBridge.Get(skill,"IsBrazierSpecific") is bool brazier && brazier)continue;
-                        // Pick the strongest authentic source item/level for this
-                        // skill. All values come from ItemDefinition, not invented.
-                        if(itemBaseDamage!=null && itemBaseDamage.Contains(level.Key) &&
-                            itemBaseDamage[level.Key] is Vector2 sourceDamage &&
-                            sourceDamage.y>0f)
-                        {
-                            if(!ItemDamageBySkill.TryGetValue(id,out Vector2 previous) ||
-                                sourceDamage.y>previous.y)
-                                ItemDamageBySkill[id]=sourceDamage;
-                        }
                         if(result.ContainsKey(id))continue; // one skill, not every item variant
                         string localization=GameBridge.Get(skill,"LocalizationId")?.ToString();
                         if(string.IsNullOrEmpty(localization))localization=id;
