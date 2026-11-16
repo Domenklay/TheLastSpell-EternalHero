@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using BepInEx.Logging;
 using EternalHero.Core;
 using HarmonyLib;
@@ -222,6 +223,90 @@ namespace EternalHero.Plugin
                  active<chosen.Length?" • нажми «Применить», если нет эффекта":" • эффект зависит от условий");
         }
 
+        // Prefer the type of a controller which this *running game* actually
+        // created, not just a type guessed by name. The constructor signature
+        // varies across The Last Spell builds, including visibility and booleans.
+        internal static object CreateOffTreeController(object definition,object hero,
+            IDictionary existing,ManualLogSource log,out string reason)
+        {
+            reason=null;
+            if(definition==null||hero==null)
+            { reason="Отсутствует игровое определение перка или герой";return null; }
+            var candidates=new List<Type>();
+            if(existing!=null)foreach(DictionaryEntry item in existing)
+            {
+                var current=GameBridge.Get(item.Value,"PerkController");
+                if(current!=null && !candidates.Contains(current.GetType()))
+                    candidates.Add(current.GetType());
+            }
+            var byName=AccessTools.TypeByName("TheLastStand.Controller.Unit.Perk.PerkController");
+            if(byName!=null&&!candidates.Contains(byName))candidates.Add(byName);
+            var descriptions=new List<string>();
+            foreach(var type in candidates)
+            {
+                foreach(var ctor in type.GetConstructors(BindingFlags.Public |
+                    BindingFlags.NonPublic | BindingFlags.Instance))
+                {
+                    var p=ctor.GetParameters();
+                    descriptions.Add(type.Name+"("+string.Join(",",
+                        p.Select(x=>x.ParameterType.Name+" "+x.Name).ToArray())+")");
+                    // Serialized-perk constructor must never be used to create
+                    // fresh permanent perks. Only bind a real PerkDefinition.
+                    if(p.Length<5 || !p[0].ParameterType.IsInstanceOfType(definition))
+                        continue;
+                    if(!p.Any(x=>x.ParameterType.IsInstanceOfType(hero)))
+                        continue;
+                    if(p.Any(x=>x.ParameterType.Name.Contains("SerializedPerk")))
+                        continue;
+                    var values=new object[p.Length];
+                    bool okay=true,ownerSet=false,definitionSet=false;
+                    int booleanIndex=0;
+                    for(int i=0;i<p.Length;i++)
+                    {
+                        var v=p[i];
+                        if(!definitionSet && v.ParameterType.IsInstanceOfType(definition))
+                        {values[i]=definition;definitionSet=true;continue;}
+                        if(!ownerSet && v.ParameterType.IsInstanceOfType(hero))
+                        {values[i]=hero;ownerSet=true;continue;}
+                        if(v.ParameterType==typeof(string))
+                        {values[i]=string.Empty;continue;}
+                        if(v.ParameterType==typeof(bool))
+                        {
+                            string n=(v.Name??"").ToLowerInvariant();
+                            values[i]=n.Contains("native") || (!n.Contains("race")&&booleanIndex==0);
+                            booleanIndex++;
+                            continue;
+                        }
+                        if(v.HasDefaultValue){values[i]=v.DefaultValue;continue;}
+                        if(!v.ParameterType.IsValueType){values[i]=null;continue;}
+                        okay=false;break;
+                    }
+                    if(!okay||!ownerSet||!definitionSet)continue;
+                    try
+                    {
+                        var controller=ctor.Invoke(values);
+                        if(GameBridge.Get(controller,"Perk")!=null)
+                        {
+                            log.LogInfo("Eternal Hero native off-tree perk factory: "+
+                                type.FullName+" constructor params="+p.Length);
+                            return controller;
+                        }
+                    }
+                    catch(Exception ex)
+                    {
+                        log.LogWarning("Off-tree perk constructor "+type.Name+
+                            " rejected: "+ex.GetBaseException().Message);
+                    }
+                }
+            }
+            reason="Не удалось создать штатный PerkController. "+
+                "Definition="+definition.GetType().FullName+
+                ", hero="+hero.GetType().FullName+
+                ", сигнатуры="+string.Join(" | ",descriptions.Take(5).ToArray());
+            log.LogWarning("Eternal Hero "+reason);
+            return null;
+        }
+
         // This works with the game's original PerkController, but does not add new columns
         // to the vanilla six-column view. It purchases any *existing* PerkDefinition
         // for one ordinary perk point and saves it as a dynamic perk in the game's save.
@@ -256,25 +341,11 @@ namespace EternalHero.Plugin
                 }
                 else
                 {
-                    var type = AccessTools.TypeByName("TheLastStand.Controller.Unit.Perk.PerkController");
                     object definition = db[id];
-                    var constructor = type?.GetConstructors().FirstOrDefault(c =>
-                    {
-                        var parameters = c.GetParameters();
-                        return parameters.Length == 7 &&
-                            parameters[0].ParameterType.IsInstanceOfType(definition) &&
-                            parameters[2].ParameterType.IsInstanceOfType(hero) &&
-                            parameters[4].ParameterType == typeof(string) &&
-                            parameters[5].ParameterType == typeof(bool) &&
-                            parameters[6].ParameterType == typeof(bool);
-                    });
-                    if (constructor == null)
-                    { error = "Неподдерживаемая версия игрового PerkController"; return false; }
-                    // isNative = false and isFromRace = false: the perk is serialized by
-                    // PlayableUnit.Serialize() as a dynamic perk, not as an original tier.
-                    controller = constructor.Invoke(new object[] {
-                        definition, null, hero, null, string.Empty, false, false
-                    });
+                    controller = CreateOffTreeController(definition,hero,perks,log,
+                        out string constructReason);
+                    if(controller==null)
+                    { error=constructReason;return false; }
                     if (GameBridge.Get(controller, "Perk") == null)
                     { error = "Игра не создала перк"; return false; }
                 }
@@ -492,27 +563,14 @@ namespace EternalHero.Plugin
                     else
                     {
                         object definition=db[id];
-                        var constructor=type.GetConstructors().FirstOrDefault(c=>
+                        controller=CreateOffTreeController(definition,hero,existing,log,
+                            out string constructReason);
+                        if(controller==null)
                         {
-                            var args=c.GetParameters();
-                            return args.Length==7&&
-                                args[0].ParameterType.IsInstanceOfType(definition)&&
-                                args[2].ParameterType.IsInstanceOfType(hero)&&
-                                args[4].ParameterType==typeof(string)&&
-                                args[5].ParameterType==typeof(bool)&&
-                                args[6].ParameterType==typeof(bool);
-                        });
-                        if(constructor==null)
-                        {
-                            var errorNote="Конструктор штатного PerkController недоступен";
-                            NoteGrantFailure(id,errorNote,log);
-                            problems.Add(id+": "+errorNote);
+                            NoteGrantFailure(id,constructReason,log);
+                            problems.Add(id+": "+constructReason);
                             continue;
                         }
-                        // As for the game's glyph perks: native=true, fromRace=false.
-                        controller=constructor.Invoke(new object[]{
-                            definition,null,hero,null,string.Empty,true,false
-                        });
                         object perk=GameBridge.Get(controller,"Perk");
                         if(perk==null)
                         {
