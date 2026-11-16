@@ -26,8 +26,8 @@ namespace EternalHero.Plugin
             {
                 int master=Rank(p,Mastery);
                 if(TierFive>0 && master>=TierFive) return BaseId+"V";
-                if(TierThree>0 && master>=TierThree) return BaseId+"III";
                 if(TierThree==4 && master>=TierThree) return BaseId+"II";
+                if(TierThree>0 && master>=TierThree) return BaseId+"III";
                 return BaseId;
             }
             internal bool Belongs(string id) =>
