@@ -2,6 +2,14 @@
 
 [![Build](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml/badge.svg)](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
 
+## v0.21 — независимые обработчики урона
+
+Основной хук `AttackSkillAction.BaseDamage` и резервный `ComputeBaseDamageRange` теперь устанавливаются независимо: отсутствие одного больше не отключает второй и не прерывает запуск всего плагина. Статус обоих виден в журнале и в диагностике F8.
+
+Для **купленных и включённых атакующих навыков Вечного защитника** основной обработчик берёт базовый урон из оружия первого слота правой руки активного комплекта, даже если прежний источник навыка возвращал ненулевое число. Действия с явным нулевым множителем урона не изменяются; постоянные перки остаются без изменений.
+
+[Сборка v0.21](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml) · [Проверка в игре](docs/INSTALL.md). Как и прежде, CI не подтверждает фактический урон в бою без запуска игры.
+
 ## v0.20 — урон от первого слота оружия
 Теперь купленные и включённые оружейные и магические атаки Вечного защитника берут базовый урон из первого оружейного слота **правой руки активного комплекта**.
 В оригинальном коде это `PlayableUnit.EquipmentSlots[RightHand][EquippedWeaponSetIndex].Item.BaseDamages`.

@@ -27,6 +27,7 @@ namespace EternalHero.Plugin
         private static readonly HashSet<string> WarnedEmptyWeaponSlot=
             new HashSet<string>(StringComparer.Ordinal);
         private static ManualLogSource combatLog;
+        private static bool itemDamageHookInstalled,rangeDamageHookInstalled;
         private static readonly HashSet<string> LoggedDamageFallback=
             new HashSet<string>(StringComparer.Ordinal);
         private static readonly HashSet<string> LoggedDamageSources=
@@ -39,31 +40,52 @@ namespace EternalHero.Plugin
         internal static void InstallDamageAdapter(Harmony harmony,ManualLogSource log)
         {
             combatLog=log;
-            var action=AccessTools.TypeByName(
-                "TheLastStand.Model.Skill.SkillAction.AttackSkillAction");
-            var getter=action==null?null:AccessTools.PropertyGetter(action,"BaseDamage");
-            var patch=AccessTools.Method(typeof(GameSkills),nameof(ResolveOwnedSkillDamage));
-            if(getter==null || patch==null)
+            // Install each layer independently: a missing BaseDamage getter must
+            // NEVER disable the combat/tooltip fallback (or abort plugin startup).
+            try
             {
-                log.LogWarning("Eternal Hero: AttackSkillAction.BaseDamage adapter unavailable");
-                return;
+                var action=AccessTools.TypeByName(
+                    "TheLastStand.Model.Skill.SkillAction.AttackSkillAction");
+                var getter=action==null?null:AccessTools.PropertyGetter(action,"BaseDamage");
+                var patch=AccessTools.Method(typeof(GameSkills),nameof(ResolveOwnedSkillDamage));
+                if(getter!=null && patch!=null)
+                {
+                    harmony.Patch(getter,postfix:new HarmonyMethod(patch));
+                    itemDamageHookInstalled=true;
+                    log.LogInfo("Eternal Hero: native item skill base damage adapter installed");
+                }
+                else log.LogWarning("Eternal Hero: AttackSkillAction.BaseDamage adapter unavailable");
             }
-            harmony.Patch(getter,postfix:new HarmonyMethod(patch));
-            // Second layer: BOTH tooltip preview and combat go through
-            // ComputeBaseDamageRange. If the source-item hook is skipped by
-            // the current game build, correct a genuinely zero attack here.
-            var controller=AccessTools.TypeByName(
-                "TheLastStand.Controller.Skill.SkillAction.AttackSkillActionController");
-            var calculate=controller==null?null:AccessTools.Method(
-                controller,"ComputeBaseDamageRange");
-            var fixRange=AccessTools.Method(typeof(GameSkills),nameof(RepairZeroBaseDamageRange));
-            if(calculate!=null&&fixRange!=null)
+            catch(Exception ex)
             {
-                harmony.Patch(calculate,postfix:new HarmonyMethod(fixRange));
-                log.LogInfo("Eternal Hero: combat + tooltip zero-damage fallback installed");
+                log.LogWarning("Eternal Hero: BaseDamage hook failed: "+
+                    ex.GetBaseException().Message);
             }
-            else log.LogWarning("Eternal Hero: secondary damage range hook unavailable");
-            log.LogInfo("Eternal Hero: native item skill base damage adapter installed");
+
+            // Second layer: tooltip preview and combat both request this range.
+            // A failure in either layer must not prevent the other being installed.
+            try
+            {
+                var controller=AccessTools.TypeByName(
+                    "TheLastStand.Controller.Skill.SkillAction.AttackSkillActionController");
+                var calculate=controller==null?null:AccessTools.Method(
+                    controller,"ComputeBaseDamageRange");
+                var fixRange=AccessTools.Method(typeof(GameSkills),nameof(RepairZeroBaseDamageRange));
+                if(calculate!=null&&fixRange!=null)
+                {
+                    harmony.Patch(calculate,postfix:new HarmonyMethod(fixRange));
+                    rangeDamageHookInstalled=true;
+                    log.LogInfo("Eternal Hero: combat + tooltip zero-damage fallback installed");
+                }
+                else log.LogWarning("Eternal Hero: secondary damage range hook unavailable");
+            }
+            catch(Exception ex)
+            {
+                log.LogWarning("Eternal Hero: secondary damage range hook failed: "+
+                    ex.GetBaseException().Message);
+            }
+            log.LogInfo("Eternal Hero: damage hooks: BaseDamage="+
+                itemDamageHookInstalled+", ComputeBaseDamageRange="+rangeDamageHookInstalled);
         }
 
         private static bool IsOurActiveNativeSkill(object action,out string id)
@@ -151,9 +173,18 @@ namespace EternalHero.Plugin
 
         private static void ResolveOwnedSkillDamage(object __instance,ref Vector2 __result)
         {
-            if(__result.x>0.001f || __result.y>0.001f)return;
             if(!IsOurActiveNativeSkill(__instance,out string id))return;
-            __result=GetSourceDamage(id); // normal game damage modifiers apply afterward
+            // The purchased attack always uses the equipped primary-hand weapon,
+            // even when its original item-independent getter returned nonzero.
+            // Support-only actions with an explicit zero multiplier stay untouched.
+            var def=GameBridge.Get(__instance,"AttackSkillActionDefinition");
+            var multiplier=GameBridge.Get(def,"DamageMultiplier");
+            if(multiplier!=null)
+            {
+                try{if(Convert.ToSingle(multiplier)<=0f)return;}
+                catch { }
+            }
+            __result=GetSourceDamage(id); // vanilla damage modifiers apply afterward
         }
 
         private static readonly Dictionary<string,Sprite> IconCache=
@@ -413,7 +444,9 @@ namespace EternalHero.Plugin
         internal static string Status(object hero,HeroProfile profile)
         {
             return Diagnostic(hero,profile)+
-                "\nОружие/украшения: собственные навыки, без предметов и TLS.ModKit";
+                "\nОружие/украшения: собственные навыки, без предметов и TLS.ModKit"+
+                "\nБоевые обработчики: BaseDamage="+(itemDamageHookInstalled?"OK":"НЕТ")+
+                ", диапазон="+(rangeDamageHookInstalled?"OK":"НЕТ");
         }
     }
 }

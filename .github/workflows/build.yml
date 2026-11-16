@@ -1,4 +1,4 @@
-name: Build Eternal Hero v0.20
+name: Build Eternal Hero v0.21
 
 on:
   push:
@@ -70,6 +70,12 @@ jobs:
           assert 'ComputeBaseDamageRange' in skills
           assert 'IsOurActiveNativeSkill' in skills
           assert 'GetSourceDamage' in skills
+          assert 'itemDamageHookInstalled=true' in skills
+          assert 'rangeDamageHookInstalled=true' in skills
+          assert 'catch(Exception ex)' in skills
+          assert 'damage hooks: BaseDamage=' in skills
+          assert 'if(__result.x>0.001f || __result.y>0.001f)return;' not in skills
+          assert 'normal game damage modifiers' not in skills or 'vanilla damage modifiers' in skills
           assert 'new Vector2Int(lo,hi)' in skills
           assert 'LogInfo("Eternal Hero: zero damage repaired' in skills
           assert 'SkillContainer' in skills
@@ -91,6 +97,6 @@ jobs:
           cp docs/INSTALL.md package/INSTALL.md
       - uses: actions/upload-artifact@v4
         with:
-          name: EternalHero-v0.20
+          name: EternalHero-v0.21
           path: package/
           if-no-files-found: error
