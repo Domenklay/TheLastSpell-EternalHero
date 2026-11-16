@@ -1,4 +1,4 @@
-name: Build Eternal Hero v0.16
+name: Build Eternal Hero v0.17
 
 on:
   push:
@@ -51,6 +51,15 @@ jobs:
           assert 'PermanentVanillaSkills' in skills and 'NativeSkills' in skills
           assert 'SkillController' in skills and 'Refresh' in skills
           assert 'EternalGhostShot' not in skills
+          assert 'DisabledVanillaSkills' in skills
+          assert 'SetEnabled(' in skills
+          assert 'TheLastStand.View.Skill.SkillView' in skills
+          assert 'GetIconSprite' in skills
+          core=Path('src/EternalHero.Core/Progression.cs').read_text()
+          assert '[DataMember] public List<string> DisabledVanillaSkills' in core
+          screen=Path('src/EternalHero.Plugin/HeroScreen.cs').read_text()
+          assert 'GameSkills.Icon(entry.Id)' in screen
+          assert 'ОТКЛЮЧИТЬ' in screen and 'ВКЛЮЧИТЬ' in screen
           print('Vanilla item source and slot-free native skill integration checked')
           PY
       - name: Prepare installable artifact
@@ -62,6 +71,6 @@ jobs:
           cp docs/INSTALL.md package/INSTALL.md
       - uses: actions/upload-artifact@v4
         with:
-          name: EternalHero-v0.16
+          name: EternalHero-v0.17
           path: package/
           if-no-files-found: error
