@@ -247,6 +247,32 @@ internal static class Program
                 lacks.Contains("4"),"insufficient essence clearly explained");
             Check(emptyService.RefundOldUnusableTechniques()==0,
                 "new profile gets no legacy refund");
+            // A purchased weapon skill can be disabled and enabled freely,
+            // with no second essence payment or change to its purchased state.
+            var toggleProfile=new HeroProfile{AvailableEssence=12};
+            var toggle=new ProgressionService(toggleProfile,true);
+            Check(toggle.PurchaseVanillaSkill("OriginalItemSkill",out _),
+                "can buy skill for on-off tests");
+            int afterBuying=toggleProfile.AvailableEssence;
+            Check(toggle.IsVanillaSkillEnabled("OriginalItemSkill"),
+                "newly purchased skill is enabled by default");
+            Check(toggle.SetVanillaSkillEnabled("OriginalItemSkill",false,out _) &&
+                !toggle.IsVanillaSkillEnabled("OriginalItemSkill") &&
+                toggleProfile.PermanentVanillaSkills.Contains("OriginalItemSkill"),
+                "disable hides ability but retains permanent purchase");
+            Check(toggleProfile.AvailableEssence==afterBuying,
+                "switching off does not charge essence");
+            Check(toggle.SetVanillaSkillEnabled("OriginalItemSkill",true,out _) &&
+                toggle.IsVanillaSkillEnabled("OriginalItemSkill"),
+                "purchased original ability can be turned on again");
+            Check(toggleProfile.AvailableEssence==afterBuying,
+                "turning a purchased skill on does not charge essence");
+            Check(!toggle.SetVanillaSkillEnabled("NeverBought",false,out _),
+                "cannot toggle an unpurchased skill");
+            toggle.SetVanillaSkillEnabled("OriginalItemSkill",false,out _);
+            var toggledAfterLoad=new ProgressionService(toggleProfile,true);
+            Check(!toggledAfterLoad.IsVanillaSkillEnabled("OriginalItemSkill"),
+                "profile normalization preserves disabled skill choice");
             Console.WriteLine("ALL PROGRESSION TESTS PASSED");
         }
         finally
