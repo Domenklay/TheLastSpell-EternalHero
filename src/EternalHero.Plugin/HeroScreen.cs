@@ -875,9 +875,23 @@ namespace EternalHero.Plugin
             Label(rightPane,"Путь к рангу 100: "+service.PurchasedUpgradeRanks+"/"+service.TotalUpgradeRanks+
                 " улучшений • "+(service.Completion*100f).ToString("0.0")+"%",
                 30,610,920,31,17,parchment);
-            Label(rightPane,string.IsNullOrWhiteSpace(status) ?
-                special ? "Техники требуют TLS.ModKit для работы в бою." :
-                    "Нажми на недоступную кнопку, чтобы увидеть точную причину." :
+            if(special)
+            {
+                Label(rightPane,GameSkills.Diagnostic(mod.CurrentHero,p),
+                    30,645,661,46,16,parchment,TextAnchor.UpperLeft);
+                Action(rightPane,"SyncSkills",710,645,242,45,"ВЫДАТЬ УМЕНИЯ",()=>{
+                    if(mod.CurrentHero==null)
+                        status="Нужно начать забег: герой пока не создан.";
+                    else
+                    {
+                        status=GameSkills.Grant(mod.CurrentHero,p,log);
+                        GameSkills.Synchronize(mod.CurrentHero,p,log);
+                    }
+                    Rebuild();
+                },true);
+            }
+            else Label(rightPane,string.IsNullOrWhiteSpace(status) ?
+                "Нажми на недоступную кнопку, чтобы увидеть точную причину." :
                 status,30,645,915,46,16,gold,TextAnchor.UpperLeft);
         }
 
