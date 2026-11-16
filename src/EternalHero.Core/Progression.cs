@@ -20,6 +20,9 @@ namespace EternalHero.Core
         [DataMember] public List<string> SelectedTraits { get; set; } = new List<string>();
         [DataMember] public List<string> SelectedPerks { get; set; } = new List<string>();
         [DataMember] public List<string> PermanentVanillaSkills { get; set; } = new List<string>();
+        // Purchased skills are never lost; disabling only hides their extra
+        // NativeSkills entry until the protagonist opts back in.
+        [DataMember] public List<string> DisabledVanillaSkills { get; set; } = new List<string>();
         // The separate personal-achievement history is monotonic across runs.
         [DataMember] public Dictionary<string, double> CareerLifetimeStats { get; set; } =
             new Dictionary<string, double>();
@@ -209,6 +212,9 @@ namespace EternalHero.Core
             if (profile.SelectedTraits == null) profile.SelectedTraits = new List<string>();
             if (profile.SelectedPerks == null) profile.SelectedPerks = new List<string>();
             if (profile.PermanentVanillaSkills == null) profile.PermanentVanillaSkills = new List<string>();
+            if (profile.DisabledVanillaSkills == null) profile.DisabledVanillaSkills = new List<string>();
+            profile.DisabledVanillaSkills.RemoveAll(id=>
+                !profile.PermanentVanillaSkills.Contains(id));
             if (profile.CareerLifetimeStats == null) profile.CareerLifetimeStats = new Dictionary<string, double>();
             if (profile.CareerLifetimeDetails == null)
                 profile.CareerLifetimeDetails = new Dictionary<string, Dictionary<string, double>>();
@@ -229,6 +235,27 @@ namespace EternalHero.Core
             {reason="Нужно "+VanillaSkillPrice+" эссенции, доступно "+Profile.AvailableEssence;return false;}
             Profile.AvailableEssence-=VanillaSkillPrice;
             Profile.PermanentVanillaSkills.Add(id);
+            return true;
+        }
+
+        public bool IsVanillaSkillEnabled(string id)
+        {
+            return !string.IsNullOrWhiteSpace(id) &&
+                Profile.PermanentVanillaSkills.Contains(id) &&
+                !Profile.DisabledVanillaSkills.Contains(id);
+        }
+
+        public bool SetVanillaSkillEnabled(string id,bool enabled,out string reason)
+        {
+            reason=null;
+            if(string.IsNullOrWhiteSpace(id) || !Profile.PermanentVanillaSkills.Contains(id))
+            {
+                reason="Сначала приобрети этот навык";
+                return false;
+            }
+            if(enabled) Profile.DisabledVanillaSkills.RemoveAll(x=>x==id);
+            else if(!Profile.DisabledVanillaSkills.Contains(id))
+                Profile.DisabledVanillaSkills.Add(id);
             return true;
         }
 
