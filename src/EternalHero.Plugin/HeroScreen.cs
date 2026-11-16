@@ -487,7 +487,8 @@ namespace EternalHero.Plugin
             int allowed=Math.Min(12,1+mod.Progression.Rank("legacy.trait"));
             if(selectedSidebarCount)
                 selectedSidebarCount.text=choosePerks
-                    ? "ПОСТОЯННЫЕ ПЕРКИ ("+names.Length+")"
+                    ? "ПЕРКИ "+names.Length+" • ВЫДАНО "+
+                        (profile.SelectedPerks?.Count(id=>GamePerks.IsLearned(mod.CurrentHero,id))??0)
                     : "ВЫБРАНО ЧЕРТ "+names.Length+"/"+allowed;
             string left=names.Length==0?"Пока ничего не выбрано":
                 string.Join("  •  ",names.Take(3).ToArray())+
@@ -737,10 +738,15 @@ namespace EternalHero.Plugin
                         TextAnchor.MiddleLeft,true);
                     string note=runMode?
                         (active?"ИЗУЧЕН": "1 ОЧКО  •  "+(entry.Category??"")):
-                        choosePerks?(entry.Category??"") + " • РАНГ "+entry.Tier:
+                        choosePerks?(active
+                            ? GamePerks.RuntimeState(mod.CurrentHero,entry.Id)
+                            : (entry.Category??"")+" • РАНГ "+entry.Tier):
                         entry.Restricted?"НЕДОСТУПНА РАСЕ":entry.Description??"";
                     if(note.Length>33) note=note.Substring(0,30)+"…";
-                    Label(button.transform,note,left,26,tileWidth-left-27,20,12,muted);
+                    Label(button.transform,note,left,26,tileWidth-left-27,20,12,
+                        choosePerks&&!runMode&&active&&
+                        !GamePerks.IsLearned(mod.CurrentHero,entry.Id)
+                            ? new Color(.98f,.52f,.39f) : muted);
                     // Native Unity pointer events: hover shows the actual localized
                     // description without forcing a click or opening a blocking popup.
                     var hover=button.gameObject.AddComponent<EventTrigger>();
