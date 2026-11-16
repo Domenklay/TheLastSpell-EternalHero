@@ -1,4 +1,4 @@
-name: Build Eternal Hero v0.9
+name: Build Eternal Hero v0.10
 
 on:
   push:
@@ -45,9 +45,9 @@ jobs:
           cp ModKit/Skills/*.patch.xml package/BepInEx/plugins/EternalHero/ModKit/Skills/
           cp ModKit/languages.csv package/BepInEx/plugins/EternalHero/ModKit/
           cd package
-          zip -r ../EternalHero-v0.9.zip BepInEx INSTALL.md
+          zip -r ../EternalHero-v0.10.zip BepInEx INSTALL.md
       - uses: actions/upload-artifact@v4
         with:
-          name: EternalHero-v0.9
-          path: EternalHero-v0.9.zip
+          name: EternalHero-v0.10
+          path: EternalHero-v0.10.zip
           if-no-files-found: error
