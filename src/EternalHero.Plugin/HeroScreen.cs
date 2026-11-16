@@ -268,8 +268,13 @@ namespace EternalHero.Plugin
             sidebarDescription=defaultSidebar.gameObject;
             var pinned=Image(left.transform,"PinnedTraits",16,502,337,81,card);
             selectedSidebar=pinned.GetComponent<RectTransform>();
-            selectedSidebarCount=Label(pinned.transform,"ВЫБРАННЫЕ ЧЕРТЫ",8,0,320,22,
+            selectedSidebarCount=Label(pinned.transform,"ВЫБРАННЫЕ ЧЕРТЫ",8,0,218,22,
                 16,gold,TextAnchor.MiddleLeft,true);
+            Action(pinned.transform,"SelectedQuickFilter",230,2,99,22,"СПИСОК",()=>{
+                traitFilter=choosePerks&&perkRunMode?1:choosePerks?1:3;
+                traitScrollPosition=1f;
+                RefreshTraitResults(mod.Profile);
+            },true);
             pinned.SetActive(false);
             Action(left.transform,"EditAppearance",23,588,320,52,"РЕДАКТОР ВНЕШНОСТИ",() => mod.OpenAppearanceEditor(),true);
 
@@ -491,6 +496,8 @@ namespace EternalHero.Plugin
         {
             if(traitPopup) UnityEngine.Object.Destroy(traitPopup);
             var popup=Image(rightPane,"TraitFullDescription",29,239,927,323,ink);
+            // The panel absorbs clicks so background cards cannot be picked accidentally.
+            popup.GetComponent<Image>().raycastTarget=true;
             traitPopup=popup;
             Image(popup.transform,"DescriptionLine",15,62,895,2,gold);
             Label(popup.transform,trait.Name,22,13,760,43,24,gold,
@@ -509,9 +516,12 @@ namespace EternalHero.Plugin
             Image(popup.transform,"DescriptionRule",20,150,885,1,gold);
             Label(popup.transform,"ОПИСАНИЕ И ЭФФЕКТЫ",22,158,860,30,
                 16,gold,TextAnchor.MiddleLeft,true);
-            Label(popup.transform,
-                string.IsNullOrWhiteSpace(trait.Description)?trait.Id:trait.Description,
-                23,194,860,102,17,parchment,TextAnchor.UpperLeft);
+            string details=string.IsNullOrWhiteSpace(trait.Description)?trait.Id:trait.Description;
+            int estimatedLines=details.Split('\n').Sum(line=>Mathf.Max(1,(line.Length+84)/85));
+            int height=Mathf.Max(112,23*estimatedLines+14);
+            var descriptionContent=Scroll(popup.transform,19,194,885,112,height);
+            Label(descriptionContent,details,8,1,845,height-2,17,parchment,
+                TextAnchor.UpperLeft);
             popup.transform.SetAsLastSibling();
         }
 
