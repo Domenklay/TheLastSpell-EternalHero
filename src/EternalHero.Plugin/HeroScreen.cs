@@ -910,13 +910,13 @@ namespace EternalHero.Plugin
                     var selection=entry;
                     bool bought=profile.PermanentVanillaSkills.Contains(entry.Id);
                     float x=8+col*457f,y=6+row*rowHeight;
-                    var card=Image(content,"Stock-"+entry.Id,x,y,cardWidth,60,card);
-                    Label(card.transform,(bought?"✓ ":"")+entry.Name,8,3,285,26,
+                    var stockTile=Image(content,"Stock-"+entry.Id,x,y,cardWidth,60,card);
+                    Label(stockTile.transform,(bought?"✓ ":"")+entry.Name,8,3,285,26,
                         17,bought?gold:parchment,TextAnchor.MiddleLeft,true);
                     string source=entry.Kind+" • "+entry.Source;
                     if(source.Length>46)source=source.Substring(0,43)+"…";
-                    Label(card.transform,source,8,32,288,23,12,muted);
-                    Action(card.transform,"BuyStock"+entry.Id,298,10,138,41,
+                    Label(stockTile.transform,source,8,32,288,23,12,muted);
+                    Action(stockTile.transform,"BuyStock"+entry.Id,298,10,138,41,
                         bought?"КУПЛЕНО":"КУПИТЬ • 4",()=>{
                             if(bought)
                                 vanillaSkillNotice="Навык «"+selection.Name+
