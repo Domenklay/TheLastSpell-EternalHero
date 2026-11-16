@@ -39,6 +39,7 @@ namespace EternalHero.Plugin
         private RectTransform vanillaSkillHost;
         private List<GameSkills.StockSkill> vanillaSkillCache;
         private string vanillaSkillNotice="Навыки берутся из оригинального оружия и украшений.";
+        private Text vanillaSkillMessage;
         private float progressionScrollPosition=1f;
         private bool choosePerks;
         private bool perkRunMode;
@@ -831,7 +832,8 @@ namespace EternalHero.Plugin
             vanillaSkillHost=Image(rightPane,"StockSkills",25,247,941,371,slate)
                 .GetComponent<RectTransform>();
             RefreshVanillaSkillLibrary(profile);
-            Label(rightPane,vanillaSkillNotice,31,626,918,57,16,gold,TextAnchor.UpperLeft);
+            vanillaSkillMessage=Label(rightPane,vanillaSkillNotice,
+                31,626,918,57,16,gold,TextAnchor.UpperLeft);
             Action(rightPane,"SyncStockSkills",750,689,203,37,"ПЕРЕПРОВЕРИТЬ",()=>{
                 if(mod.CurrentHero==null)
                     vanillaSkillNotice="Сначала загрузи забег с главным героем.";
@@ -919,6 +921,24 @@ namespace EternalHero.Plugin
                     string source=entry.Kind+" • "+entry.Source;
                     if(source.Length>46)source=source.Substring(0,43)+"…";
                     Label(stockTile.transform,source,8,32,288,23,12,muted);
+                    var hover=stockTile.gameObject.AddComponent<EventTrigger>();
+                    var enter=new EventTrigger.Entry{eventID=EventTriggerType.PointerEnter};
+                    enter.callback.AddListener(_=>{
+                        if(vanillaSkillMessage)
+                        {
+                            string desc=string.IsNullOrWhiteSpace(selection.Description)
+                                ?"Использует оригинальную игровую способность.":selection.Description;
+                            if(desc.Length>260)desc=desc.Substring(0,257)+"…";
+                            vanillaSkillMessage.text=selection.Name+" ("+selection.Source+
+                                "): "+desc;
+                        }
+                    });
+                    hover.triggers.Add(enter);
+                    var exit=new EventTrigger.Entry{eventID=EventTriggerType.PointerExit};
+                    exit.callback.AddListener(_=>{
+                        if(vanillaSkillMessage)vanillaSkillMessage.text=vanillaSkillNotice;
+                    });
+                    hover.triggers.Add(exit);
                     Action(stockTile.transform,"BuyStock"+entry.Id,298,10,138,41,
                         bought?"КУПЛЕНО":"КУПИТЬ • 4",()=>{
                             if(bought)
