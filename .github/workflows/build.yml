@@ -1,4 +1,4 @@
-name: Build Eternal Hero v0.12
+name: Build Eternal Hero v0.13
 
 on:
   push:
@@ -54,6 +54,6 @@ jobs:
           cp ModKit/languages.csv package/BepInEx/plugins/EternalHero/ModKit/
       - uses: actions/upload-artifact@v4
         with:
-          name: EternalHero-v0.12
+          name: EternalHero-v0.13
           path: package/
           if-no-files-found: error
