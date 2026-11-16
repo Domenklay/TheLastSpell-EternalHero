@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Patch target="SkillDefinition" action="add" id="EternalEtherSlashIII">
+  <Definition>
+    <SkillDefinition Id="EternalEtherSlashIII">
+      <OverrideArtId>Slice</OverrideArtId>
+      <ActionPointsCost>2</ActionPointsCost>
+      <ManaCost>4</ManaCost>
+      <UsesPerTurnCount>1</UsesPerTurnCount>
+      <Range Min="1" Max="1" Modifiable="false"/>
+      <AreaOfEffect OriginX="1" OriginY="0">
+        _XXX_
+      </AreaOfEffect>
+      <SkillAction>
+        <Attack>
+          <AttackType>Physical</AttackType>
+          <DamageMultiplier>1.75</DamageMultiplier>
+        </Attack>
+      </SkillAction>
+      <CastFXs TotalDuration="0.65">
+        <VisualEffect>
+          <Paths>
+            <Path Orientation="S">ShortSword/Slice/Slice_Caster_S</Path>
+            <Path Orientation="N">ShortSword/Slice/Slice_Caster_N</Path>
+            <Path Orientation="W">ShortSword/Slice/Slice_Caster_W</Path>
+            <Path Orientation="E">ShortSword/Slice/Slice_Caster_E</Path>
+          </Paths>
+          <Target>HitTiles</Target>
+          <SortingDepth>Before</SortingDepth>
+          <Delay>0.15</Delay>
+        </VisualEffect>
+        <SoundEffect>
+          <Path>ShortSword/Slice/SFX_Skill_Sword_Slice</Path>
+          <Delay>0.1</Delay>
+        </SoundEffect>
+      </CastFXs>
+    </SkillDefinition>
+  </Definition>
+</Patch>
