@@ -32,6 +32,7 @@ namespace EternalHero.Plugin
         private int tab;
         private int mainBranchChoice;
         private int specialBranchChoice;
+        private float progressionScrollPosition=1f;
         private bool choosePerks;
         private bool perkRunMode;
         private int traitFilter;
@@ -789,7 +790,9 @@ namespace EternalHero.Plugin
         {
             var service = mod.Progression;
             FrameHeader(special ? "ЗАПРЕТНЫЕ ТЕХНИКИ И ЭХА" : "НАСЛЕДИЕ ГЕРОЯ",
-                "Свободный порядок развития. Метаранг растёт вместе с изученными узлами.");
+                service.IgnorePrerequisites ?
+                    "Свободная прокачка: предыдущие узлы не требуются. Нужна только эссенция.":
+                    "Строгая прокачка: отдельным узлам нужны предшествующие таланты.");
             Label(rightPane, "МЕТАРАНГ " + service.MetaRank + "/100   •   ЭССЕНЦИЯ " +
                 p.AvailableEssence + "   •   УЗЛЫ " + service.PurchasedUpgradeRanks +
                 "/" + service.TotalUpgradeRanks, 29,109,921,34,19,gold,TextAnchor.MiddleLeft,true);
@@ -805,6 +808,8 @@ namespace EternalHero.Plugin
                     choices[i].ToUpperInvariant(), () => {
                         if (special) specialBranchChoice=index;
                         else mainBranchChoice=index;
+                        progressionScrollPosition=1f;
+                        status="";
                         Rebuild();
                     }, i==selected);
             }
@@ -814,6 +819,7 @@ namespace EternalHero.Plugin
             Label(rightPane,branch.ToUpperInvariant()+"   •   "+completed+"/16 освоено",
                 33,202,865,33,19,gold,TextAnchor.MiddleLeft,true);
             var scroll=Scroll(rightPane,24,240,945,331,upgrades.Length*107+15);
+            var scrollRect=scroll.parent.GetComponent<ScrollRect>();
             int pos=0;
             foreach (var upgrade in upgrades)
             {
@@ -830,18 +836,37 @@ namespace EternalHero.Plugin
                     continue;
                 }
                 bool can=service.CanPurchase(upgrade.Id,out string reason);
+                int cost=upgrade.CostForNextRank(rank);
                 var node=upgrade;
-                var buy=Action(scroll,"Buy-"+upgrade.Id,693,y+25,186,48,
-                    "ИЗУЧИТЬ • "+upgrade.CostForNextRank(rank),()=>{
-                        if(service.Purchase(node.Id,out string error))
-                        {
-                            Save();
-                            mod.ApplyCurrentHero();
-                            Notify("Изучено: "+node.Name);
-                        }
-                        else Notify("Недоступно: "+error);
-                    });
-                buy.interactable=can;
+                string buttonText=can?"ИЗУЧИТЬ • "+cost:
+                    p.AvailableEssence<cost?"МАЛО ЭСС. • "+p.AvailableEssence+"/"+cost:
+                    "НУЖЕН ТАЛАНТ";
+                var buy=Action(scroll,"Buy-"+upgrade.Id,693,y+25,186,48,buttonText,()=>{
+                    if(service.Purchase(node.Id,out string error))
+                    {
+                        Save();
+                        mod.ApplyCurrentHero();
+                        status="Изучено: "+node.Name+" • "+service.Rank(node.Id)+
+                            "/"+node.MaxRank;
+                        Rebuild();
+                    }
+                    else
+                    {
+                        status="Нельзя изучить «"+node.Name+"»: "+error;
+                        Rebuild();
+                    }
+                },can);
+                // Unaffordable buttons still respond: explain why instead of silent grey.
+                buy.interactable=true;
+                if(!can)
+                    Label(scroll,reason??"Недоступно",23,y+76,650,19,13,
+                        new Color(.95f,.64f,.44f),TextAnchor.MiddleLeft);
+            }
+            if(scrollRect!=null)
+            {
+                scrollRect.verticalNormalizedPosition=Mathf.Clamp01(progressionScrollPosition);
+                scrollRect.onValueChanged.AddListener(_ =>
+                    progressionScrollPosition=scrollRect.verticalNormalizedPosition);
             }
             Image(rightPane,"ProgressBack",30,588,917,17,new Color(.12f,.13f,.16f));
             float progress=Mathf.Clamp01(service.Completion);
@@ -850,10 +875,10 @@ namespace EternalHero.Plugin
             Label(rightPane,"Путь к рангу 100: "+service.PurchasedUpgradeRanks+"/"+service.TotalUpgradeRanks+
                 " улучшений • "+(service.Completion*100f).ToString("0.0")+"%",
                 30,610,920,31,17,parchment);
-            Label(rightPane,special ?
-                "Техники усиливаются от рангов мастерства, а Эфирный шаг доступен без оружия. Нужен TLS.ModKit." :
-                "При полной прокачке всех шести веток откроется бесконечное Возвышение.",
-                30,645,915,46,16,muted,TextAnchor.UpperLeft);
+            Label(rightPane,string.IsNullOrWhiteSpace(status) ?
+                special ? "Техники требуют TLS.ModKit для работы в бою." :
+                    "Нажми на недоступную кнопку, чтобы увидеть точную причину." :
+                status,30,645,915,46,16,gold,TextAnchor.UpperLeft);
         }
 
         private void DrawAscension(HeroProfile p)
