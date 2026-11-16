@@ -49,6 +49,92 @@ namespace EternalHero.Plugin
             return p.Ranks.TryGetValue(id,out int rank)?rank:0;
         }
 
+        // The native skill bar caches its button list. Changing NativeSkills alone
+        // does not invalidate that cache; the same Refresh(true) call the game uses
+        // when a unit learns a perk is required.
+        private static void RefreshNativeSkillUI(object hero, ManualLogSource log)
+        {
+            try
+            {
+                object selected=GameBridge.StaticGet(
+                    "TheLastStand.Manager.TileObjectSelectionManager","SelectedPlayableUnit");
+                if(!ReferenceEquals(selected,hero)) return;
+                object ui=GameBridge.Singleton(
+                    "TheLastStand.View.HUD.UnitManagement.PlayableUnitManagementView");
+                object bar=GameBridge.Get(ui,"PlayableSkillBar");
+                var method=bar?.GetType().GetMethod("Refresh",new[]{typeof(bool)});
+                if(method!=null)
+                {
+                    method.Invoke(bar,new object[]{true});
+                    log.LogInfo("Eternal Hero: native scroll-like skill bar rebuilt (no inventory item)");
+                }
+                else log.LogWarning("Eternal Hero: PlayableSkillBar.Refresh(true) unavailable");
+            }
+            catch(Exception e)
+            {
+                log.LogWarning("Eternal Hero skill bar refresh: "+e.GetBaseException().Message);
+            }
+            try
+            {
+                object sheet=GameBridge.Singleton("TheLastStand.View.CharacterSheet.CharacterSheetPanel");
+                var method=sheet?.GetType().GetMethods().FirstOrDefault(m=>
+                    m.Name=="RefreshSkills" && m.GetParameters().Length==1 &&
+                    m.GetParameters()[0].ParameterType.IsInstanceOfType(hero));
+                if(method!=null) method.Invoke(sheet,new[]{hero});
+            }
+            catch(Exception e)
+            {
+                log.LogInfo("Eternal Hero character sheet refresh deferred: "+e.GetBaseException().Message);
+            }
+        }
+
+        // A late TLS.ModKit load or a new scene must not leave acquired skills
+        // permanently absent until the user clicks 'Check integration'.
+        internal static bool NeedsSync(object hero, HeroProfile profile)
+        {
+            if(hero==null || profile?.Ranks==null) return false;
+            var native=GameBridge.Get(hero,"NativeSkills") as IList;
+            if(native==null) return false;
+            var db=GameBridge.StaticGet(
+                "TheLastStand.Database.Unit.SkillDatabase","SkillDefinitions") as IDictionary;
+            foreach(var track in Tracks)
+            {
+                if(Rank(profile,track.Unlock)<1) continue;
+                string wanted=track.Choose(profile);
+                string equipped=null;
+                foreach(object skill in native)
+                {
+                    var id=GameBridge.Get(GameBridge.Get(skill,"SkillDefinition"),"Id")?.ToString();
+                    if(track.Belongs(id)) { equipped=id; break; }
+                }
+                if(equipped==null) return true;
+                if(db!=null && db.Contains(wanted) && equipped!=wanted) return true;
+            }
+            return false;
+        }
+
+        internal static string Diagnostic(object hero, HeroProfile profile)
+        {
+            var db=GameBridge.StaticGet(
+                "TheLastStand.Database.Unit.SkillDatabase","SkillDefinitions") as IDictionary;
+            var native=GameBridge.Get(hero,"NativeSkills") as IList;
+            int definitions=0,learned=0,equipped=0;
+            foreach(var t in Tracks)
+            {
+                if(db!=null && db.Contains(t.BaseId)) definitions++;
+                if(Rank(profile,t.Unlock)<=0) continue;
+                learned++;
+                if(native!=null)
+                    foreach(var skill in native)
+                    {
+                        string id=GameBridge.Get(GameBridge.Get(skill,"SkillDefinition"),"Id")?.ToString();
+                        if(t.Belongs(id)) {equipped++;break;}
+                    }
+            }
+            return "Определения TLS.ModKit: "+definitions+"/"+Tracks.Length+
+                "  •  куплено: "+learned+"  •  выдано герою: "+equipped;
+        }
+
         internal static string Grant(object hero, HeroProfile profile, ManualLogSource log)
         {
             if(hero==null||profile==null) return "hero missing";
@@ -80,7 +166,7 @@ namespace EternalHero.Plugin
                 {
                     string oldId=GameBridge.Get(GameBridge.Get(native[i],"SkillDefinition"),"Id")?.ToString();
                     if(!track.Belongs(oldId)) continue;
-                    if(unlocked && oldId==id) {present=true; continue;}
+                    if(unlocked && oldId==id && !present) {present=true; continue;}
                     native.RemoveAt(i);
                     removed++;
                 }
@@ -113,6 +199,10 @@ namespace EternalHero.Plugin
                     missing++;
                 }
             }
+            if(equipped>0 || removed>0) RefreshNativeSkillUI(hero,log);
+            if(missing>0)
+                log.LogWarning("Eternal Hero: "+missing+
+                    " learned skills missing, check ModKit [Skills] parse logs.");
             return "equipped="+equipped+", upgraded/removed="+removed+
                 ", missing definitions="+missing+", native total="+native.Count;
         }
@@ -133,8 +223,9 @@ namespace EternalHero.Plugin
                 }
                 lines.Add(best+(found?" ✓":" (не найден в игре)"));
             }
-            return lines.Count==0?"Особые боевые навыки ещё не изучены":
-                string.Join("  •  ",lines.ToArray());
+            return Diagnostic(hero,profile)+"\n"+
+                (lines.Count==0?"Особые боевые навыки ещё не изучены":
+                    string.Join("  •  ",lines.ToArray()));
         }
     }
 }
