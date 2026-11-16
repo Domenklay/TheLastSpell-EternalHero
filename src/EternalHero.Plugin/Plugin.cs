@@ -14,7 +14,7 @@ namespace EternalHero.Plugin
     public sealed class Plugin : BaseUnityPlugin
     {
         internal const string Id = "domenklay.tls.eternalhero";
-        internal const string Version = "0.17.0";
+        internal const string Version = "0.18.0";
 
         private Harmony harmony;
         private ProfileStore store;
@@ -90,6 +90,7 @@ namespace EternalHero.Plugin
                 harmony = new Harmony(Id);
                 RacialPenaltyGuard.Install(harmony, Logger);
                 GamePerks.Install(harmony, Logger);
+                GameSkills.InstallDamageAdapter(harmony, Logger);
                 LastStandGuard.Install(harmony, Logger);
                 var start = AccessTools.Method("TheLastStand.Manager.Unit.PlayableUnitManager:CreateStartUnits");
                 if (start != null)
