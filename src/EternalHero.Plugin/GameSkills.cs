@@ -70,12 +70,12 @@ namespace EternalHero.Plugin
                     "TheLastStand.Controller.Skill.SkillAction.AttackSkillActionController");
                 var calculate=controller==null?null:AccessTools.Method(
                     controller,"ComputeBaseDamageRange");
-                var fixRange=AccessTools.Method(typeof(GameSkills),nameof(RepairZeroBaseDamageRange));
+                var fixRange=AccessTools.Method(typeof(GameSkills),nameof(EnforcePurchasedAttackDamageFloor));
                 if(calculate!=null&&fixRange!=null)
                 {
                     harmony.Patch(calculate,postfix:new HarmonyMethod(fixRange));
                     rangeDamageHookInstalled=true;
-                    log.LogInfo("Eternal Hero: combat + tooltip zero-damage fallback installed");
+                    log.LogInfo("Eternal Hero: combat + tooltip purchased-attack damage floor installed");
                 }
                 else log.LogWarning("Eternal Hero: secondary damage range hook unavailable");
             }
@@ -150,25 +150,40 @@ namespace EternalHero.Plugin
             return new Vector2(18f,26f);
         }
 
-        private static void RepairZeroBaseDamageRange(object __instance,
+        // Called after the game's own skill-base range calculation. The
+        // original multiplier may be as small as 0.1 even for a powerful gun:
+        // unlike v0.21, enforce a minimum for ALL purchased attacks, not only
+        // for zero-damage failures. Vanilla high-damage skills retain their
+        // larger original range. The result is used by preview and combat.
+        private static void EnforcePurchasedAttackDamageFloor(object __instance,
             ref Vector2Int __result)
         {
-            if(__result.y>0 || !IsOurActiveNativeSkill(
-                GameBridge.Get(__instance,"SkillAction"),out string id)) return;
             var action=GameBridge.Get(__instance,"SkillAction");
-            var def=GameBridge.Get(action,"AttackSkillActionDefinition");
-            float multiplier=1f;
-            try{multiplier=Convert.ToSingle(GameBridge.Get(def,"DamageMultiplier")??1f);}
-            catch { }
-            if(multiplier<=0f)return; // a legitimate support-only attack
+            if(!IsOurActiveNativeSkill(action,out string id))return;
+            var definition=GameBridge.Get(action,"AttackSkillActionDefinition");
+            var rawMultiplier=GameBridge.Get(definition,"DamageMultiplier");
+            if(rawMultiplier!=null)
+            {
+                try{if(Convert.ToSingle(rawMultiplier)<=0f)return;}
+                catch { }
+            }
             Vector2 source=GetSourceDamage(id);
-            int lo=Mathf.Max(1,Mathf.RoundToInt(source.x*multiplier));
-            int hi=Mathf.Max(lo,Mathf.RoundToInt(source.y*multiplier));
-            __result=new Vector2Int(lo,hi);
-            if(LoggedDamageFallback.Add(id))
-                combatLog?.LogInfo("Eternal Hero: zero damage repaired for "+id+
-                    " using "+source.x+"–"+source.y+", multiplier "+multiplier+
-                    ", output "+lo+"–"+hi+" (tooltip and combat)");
+            int lower=__result.x,upper=__result.y;
+            int oldLower=lower,oldUpper=upper;
+            float weaponFactor=Plugin.Instance?.PurchasedAttackDamageFloor??1.25f;
+            if(!PurchasedAttackDamageFloor.Apply(ref lower,ref upper,
+                source.x,source.y,weaponFactor))return;
+            __result=new Vector2Int(lower,upper);
+            string key=id+":"+source.x+":"+source.y+":"+
+                oldLower+":"+oldUpper+":"+lower+":"+upper;
+            // Only log distinct corrections and cap memory usage during
+            // extended runs with repeated stat/weapon changes.
+            if(LoggedDamageFallback.Count<512 && LoggedDamageFallback.Add(key))
+                combatLog?.LogInfo("Eternal Hero: purchased attack floor applied to "+
+                    id+"; original "+oldLower+"–"+oldUpper+
+                    ", source "+source.x+"–"+source.y+
+                    ", minimum="+(weaponFactor*100f)+"%, output "+
+                    lower+"–"+upper+" (tooltip and combat)");
         }
 
         private static void ResolveOwnedSkillDamage(object __instance,ref Vector2 __result)
@@ -446,7 +461,9 @@ namespace EternalHero.Plugin
             return Diagnostic(hero,profile)+
                 "\nОружие/украшения: собственные навыки, без предметов и TLS.ModKit"+
                 "\nБоевые обработчики: BaseDamage="+(itemDamageHookInstalled?"OK":"НЕТ")+
-                ", диапазон="+(rangeDamageHookInstalled?"OK":"НЕТ");
+                ", диапазон="+(rangeDamageHookInstalled?"OK":"НЕТ")+
+                "\nМинимальный базовый урон купленных атак: "+
+                Mathf.RoundToInt((Plugin.Instance?.PurchasedAttackDamageFloor??1.25f)*100f)+"% оружия";
         }
     }
 }

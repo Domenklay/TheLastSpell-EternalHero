@@ -1,4 +1,4 @@
-name: Build Eternal Hero v0.21
+name: Build Eternal Hero v0.22
 
 on:
   push:
@@ -66,7 +66,9 @@ jobs:
           assert 'GameBridge.Get(equipped,"BaseDamages")' in skills
           assert 'return new Vector2(18f,26f)' in skills
           assert 'ItemDamageBySkill' not in skills
-          assert 'RepairZeroBaseDamageRange' in skills
+          assert 'EnforcePurchasedAttackDamageFloor' in skills
+          assert 'PurchasedAttackDamageFloor.Apply' in skills
+          assert 'if(__result.y>0 || !IsOurActiveNativeSkill(' not in skills
           assert 'ComputeBaseDamageRange' in skills
           assert 'IsOurActiveNativeSkill' in skills
           assert 'GetSourceDamage' in skills
@@ -77,10 +79,13 @@ jobs:
           assert 'if(__result.x>0.001f || __result.y>0.001f)return;' not in skills
           assert 'normal game damage modifiers' not in skills or 'vanilla damage modifiers' in skills
           assert 'new Vector2Int(lo,hi)' in skills
-          assert 'LogInfo("Eternal Hero: zero damage repaired' in skills
+          assert 'LogInfo("Eternal Hero: purchased attack floor applied' in skills
           assert 'SkillContainer' in skills
           plugin=Path('src/EternalHero.Plugin/Plugin.cs').read_text()
           assert 'GameSkills.InstallDamageAdapter(harmony, Logger)' in plugin
+          assert 'PurchasedAttackDamageFloorPercent' in plugin
+          assert 'internal const string Version = "0.22.0"' in plugin
+          assert 'minimumWeaponFactor' not in skills
           core=Path('src/EternalHero.Core/Progression.cs').read_text()
           assert '[DataMember] public List<string> DisabledVanillaSkills' in core
           screen=Path('src/EternalHero.Plugin/HeroScreen.cs').read_text()
@@ -97,6 +102,6 @@ jobs:
           cp docs/INSTALL.md package/INSTALL.md
       - uses: actions/upload-artifact@v4
         with:
-          name: EternalHero-v0.21
+          name: EternalHero-v0.22
           path: package/
           if-no-files-found: error

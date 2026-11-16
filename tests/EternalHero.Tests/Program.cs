@@ -16,6 +16,30 @@ internal static class Program
         var temp = Path.Combine(Path.GetTempPath(), "eternal-hero-" + Guid.NewGuid().ToString("N"));
         try
         {
+            // Regression cases from v0.21 screenshots: 176–224 gun, weak
+            // Buckshot (155–193), weak Lightning (22–31) and no-weapon case.
+            int low=155,high=193;
+            Check(PurchasedAttackDamageFloor.Apply(ref low,ref high,176f,224f,1.25f)
+                && low==220 && high==280,
+                "shotgun reaches 125 percent active weapon minimum");
+            low=22;high=31;
+            Check(PurchasedAttackDamageFloor.Apply(ref low,ref high,176f,224f,1.25f)
+                && low==220 && high==280,
+                "low-multiplier lightning reaches weapon damage minimum");
+            low=400;high=500;
+            Check(!PurchasedAttackDamageFloor.Apply(ref low,ref high,176f,224f,1.25f)
+                && low==400 && high==500,
+                "strong original skills are never nerfed");
+            low=0;high=0;
+            Check(PurchasedAttackDamageFloor.Apply(ref low,ref high,18f,26f,1.25f)
+                && low==23 && high==33,
+                "unarmed fallback remains usable");
+            Check(!PurchasedAttackDamageFloor.Apply(ref low,ref high,176f,224f,0f)
+                && low==23 && high==33,
+                "config value zero disables the floor");
+            Check(!PurchasedAttackDamageFloor.Apply(ref low,ref high,176f,224f,1.25f)
+                && low==220 && high==280,
+                "damage floor patch is idempotent");
             var store = new ProfileStore(Path.Combine(temp, "hero.json"));
             var service = new ProgressionService(store.Load());
 
