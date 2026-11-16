@@ -46,6 +46,15 @@ namespace EternalHero.Plugin
         }
 
         private const string Database = "TheLastStand.Database.Unit.PlayableUnitDatabase";
+        private static readonly Dictionary<string,string> LastGrantFailures =
+            new Dictionary<string,string>(StringComparer.Ordinal);
+        internal static string LastFailure(string id) =>
+            id != null && LastGrantFailures.TryGetValue(id,out string message) ? message : "";
+        private static void NoteGrantFailure(string id,string error,ManualLogSource log)
+        {
+            LastGrantFailures[id]=error;
+            log.LogWarning("Eternal Hero permanent perk "+id+": "+error);
+        }
         public sealed class Option
         {
             public string Id;
@@ -188,9 +197,11 @@ namespace EternalHero.Plugin
         {
             if(hero==null) return "НЕТ ГЕРОЯ";
             var perks=GameBridge.Get(hero,"Perks") as IDictionary;
-            if(perks==null || !perks.Contains(id)) return "НЕ ВЫДАН";
+            if(perks==null || !perks.Contains(id)) return "НЕ ВЫДАН"+
+                (string.IsNullOrWhiteSpace(LastFailure(id))?"":": "+LastFailure(id));
             var perk=perks[id];
-            if(!IsLearned(hero,id)) return "НЕ АКТИВИРОВАН";
+            if(!IsLearned(hero,id)) return "НЕ АКТИВИРОВАН"+
+                (string.IsNullOrWhiteSpace(LastFailure(id))?"":": "+LastFailure(id));
             return GameBridge.Get(perk,"PerkTier")==null
                 ? "ВЫДАН • ВНЕ СЛУЧАЙНОГО ДЕРЕВА"
                 : "ВЫДАН • В ДЕРЕВЕ";
@@ -407,13 +418,17 @@ namespace EternalHero.Plugin
                     unlock.Invoke(controller, new[] { hero });
                     if (IsLearned(hero, id)) total++;
                     else problems.Add(id + ": unlocked state not confirmed");
+                    if(IsLearned(hero,id)) LastGrantFailures.Remove(id);
+                    else NoteGrantFailure(id,"Unlock completed but no owner unlocker. "+
+                        "Perk definition or game UI rejected activation.",log);
                     log.LogInfo("Eternal Hero permanent perk "+id+
                         ": "+RuntimeState(hero,id));
                 }
                 catch (Exception e)
                 {
-                    problems.Add(id + ": " + e.GetBaseException().Message);
-                    log.LogWarning("Eternal Hero permanent perk " + id + ": " + e.GetBaseException().Message);
+                    string why=e.GetBaseException().Message;
+                    problems.Add(id + ": " + why);
+                    NoteGrantFailure(id,why,log);
                 }
             }
             var summary = "perks active/already available=" + total + "/" + slots;
