@@ -225,6 +225,28 @@ internal static class Program
             Check(!poor.Purchase("tactics.action",out string priceReason) &&
                 priceReason.Contains("4") && priceReason.Contains("1"),
                 "insufficient essence shows exact required/available points");
+            var stockProfile=new HeroProfile{AvailableEssence=18};
+            stockProfile.Ranks["forbidden.ghostshot"]=1;
+            stockProfile.Ranks["trinity.hunter"]=1;
+            var stockService=new ProgressionService(stockProfile,true);
+            Check(stockService.RefundOldUnusableTechniques()==10,
+                "old incompatible XML talents get one-time essence compensation");
+            Check(stockService.RefundOldUnusableTechniques()==0,
+                "legacy compensation never duplicates");
+            int credits=stockProfile.AvailableEssence;
+            Check(stockService.PurchaseVanillaSkill("OriginalSwordSkill",out _),
+                "purchase an original ability permanently");
+            Check(stockProfile.PermanentVanillaSkills.Contains("OriginalSwordSkill") &&
+                stockProfile.AvailableEssence==credits-4,
+                "skill purchase persists and consumes four essence");
+            Check(!stockService.PurchaseVanillaSkill("OriginalSwordSkill",out _),
+                "skill cannot be bought twice");
+            var emptyProfile=new HeroProfile{AvailableEssence=0};
+            var emptyService=new ProgressionService(emptyProfile,true);
+            Check(!emptyService.PurchaseVanillaSkill("NoEssence",out string lacks) &&
+                lacks.Contains("4"),"insufficient essence clearly explained");
+            Check(emptyService.RefundOldUnusableTechniques()==0,
+                "new profile gets no legacy refund");
             Console.WriteLine("ALL PROGRESSION TESTS PASSED");
         }
         finally
