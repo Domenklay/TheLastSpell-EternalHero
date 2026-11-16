@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Collections;
 using BepInEx.Logging;
 using HarmonyLib;
 
@@ -69,6 +70,29 @@ namespace EternalHero.Plugin
                 return;
             if (IsOurHero(GameBridge.Get(perk, "Owner")))
                 __result = 0f;
+        }
+
+        internal static string RaceSummary(object hero)
+        {
+            if(hero==null) return "нет героя";
+            try
+            {
+                var controller=GameBridge.Get(hero,"PlayableUnitStatsController");
+                var stats=GameBridge.Get(controller,"UnitStats");
+                var values=GameBridge.Get(stats,"Stats") as IDictionary;
+                if(values==null) return "данные характеристик пока недоступны";
+                int negative=0;
+                foreach(DictionaryEntry item in values)
+                {
+                    object raw=GameBridge.Get(item.Value,"Race");
+                    if(raw==null) continue;
+                    float value=Convert.ToSingle(raw);
+                    if(value<0f && !float.IsNaN(value)) negative++;
+                }
+                return negative+" отрицательных статовых модификаторов "+
+                    (IsOurHero(hero)?"(компенсируются в расчёте)":"(не изменены)");
+            }
+            catch(Exception e) { return "диагностика недоступна: "+e.GetBaseException().Message; }
         }
 
         private static void NullifyRaceStatFinal(object __instance, ref float __result)
