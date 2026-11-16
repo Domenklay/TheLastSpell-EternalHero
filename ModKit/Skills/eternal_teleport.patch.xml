@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Patch target="SkillDefinition" action="add" id="EternalTeleport">
+  <Definition>
+    <SkillDefinition Id="EternalTeleport">
+      <OverrideArtId>Slice</OverrideArtId>
+      <ActionPointsCost>1</ActionPointsCost>
+      <ManaCost>4</ManaCost>
+      <UsesPerTurnCount>1</UsesPerTurnCount>
+      <Range Min="1" Max="6" Modifiable="true"/>
+      <AreaOfEffect OriginX="0" OriginY="0">M</AreaOfEffect>
+      <ValidTargets><EmptyTiles/><WalkableTiles/></ValidTargets>
+      <SkillAction><Generic><SkillEffects><Maneuver/></SkillEffects></Generic></SkillAction>
+      <CastFXs TotalDuration="0.4">
+        <VisualEffect>
+          <Paths><Path Orientation="NSEW">DruidicStaff/Lightning Strike/LightningStrike_ThunderNSEW</Path></Paths>
+          <Target>HitTiles</Target>
+          <SortingDepth>Before</SortingDepth>
+          <Delay>0.05</Delay>
+        </VisualEffect>
+      </CastFXs>
+    </SkillDefinition>
+  </Definition>
+</Patch>
