@@ -41,6 +41,10 @@ internal static class Program
             Check(!PurchasedAttackDamageFloor.Apply(ref low,ref high,176f,224f,1.25f)
                 && low==220 && high==280,
                 "damage floor patch is idempotent");
+            low=18;high=26;
+            Check(PurchasedAttackDamageFloor.Apply(ref low,ref high,150f,150f,1.25f)
+                && low==188 && high==188,
+                "fixed 150 weapon-source fallback reaches 188 minimum");
             var store = new ProfileStore(Path.Combine(temp, "hero.json"));
             var service = new ProgressionService(store.Load());
 

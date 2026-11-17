@@ -2,6 +2,16 @@
 
 [![Build](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml/badge.svg)](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
 
+## v0.24 — безопасная запасная база 150 и диагностика геттеров
+
+Лог v0.23 доказал, что оружие действительно находится в `RightHand[0]` (`Item`, уровень 2), но `BaseDamages` через reflection возвращает `NULL`. Значит, не нужно менять слоты или выдавать фальшивое оружие.
+
+Теперь при недоступности характеристик предмета купленные атакующие умения получают базу **150**, управляемую `FallbackAttackBaseDamage = 150` в `BepInEx/config/domenklay.tls.eternalhero.cfg`. При обычной нижней планке 125% это **188** базового урона, а не 21–28. Если настоящий `BaseDamages` успешно прочитан, он имеет приоритет: фиксированная база не используется. Это не изменяет реальный урон предмета и не затрагивает других персонажей.
+
+Также чтение `BaseDamages` теперь логирует точное исключение (если было), `ItemDefinition.BaseDamageByLevel` и доступные уровни, а не только `NULL`. После игрового теста можно будет окончательно устранить проблему чтения, не полагаясь на фиксированную базу.
+
+[Установка v0.24](docs/INSTALL.md) · [Сборки](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml).
+
 ## v0.23 — диагностика и чтение реального оружия
 
 Лог v0.22 показал `BaseDamage=True, ComputeBaseDamageRange=True`, но оба купленных навыка использовали базу 18–26, поскольку чтение экипировки не находило оружие. Новый адаптер проверяет структуру `EquipmentSlots` и числовые/строковые ключи рук, читает активный комплект и пытается получить базовый урон из свойства `Item.BaseDamages` либо из `ItemDefinition.BaseDamageByLevel[Level]`. При пустой правой руке используется оружие левой руки того же активного комплекта. Каждый переход к резервному урону или успешное чтение снабжается диагностической строкой `Eternal Hero equipment probe:` в `BepInEx/LogOutput.log`.

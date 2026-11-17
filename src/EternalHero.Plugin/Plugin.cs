@@ -14,7 +14,7 @@ namespace EternalHero.Plugin
     public sealed class Plugin : BaseUnityPlugin
     {
         internal const string Id = "domenklay.tls.eternalhero";
-        internal const string Version = "0.23.0";
+        internal const string Version = "0.24.0";
 
         private Harmony harmony;
         private ProfileStore store;
@@ -28,6 +28,7 @@ namespace EternalHero.Plugin
         private ConfigEntry<float> editorScale;
         private ConfigEntry<bool> removeRacePenalties;
         private ConfigEntry<float> purchasedAttackDamageFloorPercent;
+        private ConfigEntry<float> fallbackAttackBaseDamage;
         private object currentHero;
         private string rosterStatus = "Герой не обнаружен; начни новый забег";
         private float nextRosterProbeTime;
@@ -46,6 +47,8 @@ namespace EternalHero.Plugin
         internal bool IgnoreRacialPenalties => removeRacePenalties == null || removeRacePenalties.Value;
         internal float PurchasedAttackDamageFloor =>
             Mathf.Clamp(purchasedAttackDamageFloorPercent?.Value ?? 125f,0f,500f)/100f;
+        internal float FallbackAttackBaseDamage =>
+            Mathf.Clamp(fallbackAttackBaseDamage?.Value ?? 150f,1f,10000f);
 
         private void Awake()
         {
@@ -65,6 +68,9 @@ namespace EternalHero.Plugin
                 purchasedAttackDamageFloorPercent = Config.Bind("Eternal Hero",
                     "PurchasedAttackDamageFloorPercent",125f,
                     "For purchased active attack skills only: minimum base damage as a percentage of the currently equipped primary-hand weapon's damage. Default 125%; 100 means at least the weapon damage, 0 disables this floor, max 500. Support skills and vanilla weapon attacks are unaffected.");
+                fallbackAttackBaseDamage = Config.Bind("Eternal Hero",
+                    "FallbackAttackBaseDamage",150f,
+                    "Base damage to use for purchased attacks ONLY when equipped weapon damage cannot be read. Defaults to 150 (with 125 percent floor this becomes minimum 188). Does not modify any equipped item.");
                 editorScale = Config.Bind("Interface", "MenuScale", .78f,
                     "Scale of the character creator window. Allowed range: 0.58 to 1.00.");
                 store = new ProfileStore(Path.Combine(Paths.ConfigPath, "EternalHero", "profile.json"));

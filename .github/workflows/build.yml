@@ -1,4 +1,4 @@
-name: Build Eternal Hero v0.23
+name: Build Eternal Hero v0.24
 
 on:
   push:
@@ -63,8 +63,10 @@ jobs:
           assert 'GameBridge.Get(hero,"EquipmentSlots")' in skills
           assert 'GameBridge.Get(hero,"EquippedWeaponSetIndex")' in skills
           assert '"RightHand"' in skills
-          assert 'GameBridge.Get(equipped,"BaseDamages")' in skills
-          assert 'return new Vector2(18f,26f)' in skills
+          assert 'ReadDamageMember(equipped,"BaseDamages"' in skills
+          assert 'FallbackAttackBaseDamage??150f' in skills
+          assert 'new Vector2(fixedBase,fixedBase)' in skills
+          assert 'getBaseDamages' not in skills
           assert 'EquipmentPairs(' in skills and 'IsHandSlot(' in skills
           assert 'TryItemDamage(' in skills and 'ReadSlots(' in skills
           assert 'Eternal Hero equipment probe:' in skills
@@ -87,7 +89,8 @@ jobs:
           plugin=Path('src/EternalHero.Plugin/Plugin.cs').read_text()
           assert 'GameSkills.InstallDamageAdapter(harmony, Logger)' in plugin
           assert 'PurchasedAttackDamageFloorPercent' in plugin
-          assert 'internal const string Version = "0.23.0"' in plugin
+          assert 'internal const string Version = "0.24.0"' in plugin
+          assert 'FallbackAttackBaseDamage",150f' in plugin
           assert 'minimumWeaponFactor' not in skills
           core=Path('src/EternalHero.Core/Progression.cs').read_text()
           assert '[DataMember] public List<string> DisabledVanillaSkills' in core
@@ -105,6 +108,6 @@ jobs:
           cp docs/INSTALL.md package/INSTALL.md
       - uses: actions/upload-artifact@v4
         with:
-          name: EternalHero-v0.23
+          name: EternalHero-v0.24
           path: package/
           if-no-files-found: error

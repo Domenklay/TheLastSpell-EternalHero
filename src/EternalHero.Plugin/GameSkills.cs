@@ -146,38 +146,103 @@ namespace EternalHero.Plugin
             return new List<object>();
         }
 
+        // Unlike GameBridge.Get, this exposes reflection exceptions in the log.
+        // The Last Spell's Item.BaseDamages getter indexes
+        // ItemDefinition.BaseDamageByLevel[Level] and can throw for missing
+        // levels; silently treating that as an unequipped weapon hid our bug.
+        private static object ReadDamageMember(object owner,string name,
+            out string detail)
+        {
+            detail="owner=NULL";
+            if(owner==null)return null;
+            var type=owner.GetType();
+            const BindingFlags flags=BindingFlags.Instance|
+                BindingFlags.Public|BindingFlags.NonPublic;
+            try
+            {
+                var property=type.GetProperty(name,flags);
+                if(property!=null && property.GetIndexParameters().Length==0)
+                {
+                    object value=property.GetValue(owner,null);
+                    detail="property "+type.Name+"."+name+
+                        "="+(value==null?"NULL":value.GetType().Name);
+                    return value;
+                }
+                var field=type.GetField(name,flags);
+                if(field!=null)
+                {
+                    object value=field.GetValue(owner);
+                    detail="field "+type.Name+"."+name+
+                        "="+(value==null?"NULL":value.GetType().Name);
+                    return value;
+                }
+                detail="missing member "+type.FullName+"."+name;
+            }
+            catch(Exception ex)
+            {
+                detail="error "+type.FullName+"."+name+": "+
+                    ex.GetBaseException().GetType().Name+": "+
+                    ex.GetBaseException().Message;
+            }
+            return null;
+        }
+
         private static bool TryItemDamage(object equipped,out Vector2 result,
             out string diagnostic)
         {
             result=Vector2.zero;
             if(equipped==null){diagnostic="item=NULL";return false;}
-            object raw=GameBridge.Get(equipped,"BaseDamages");
+            string baseStatus;
+            object raw=ReadDamageMember(equipped,"BaseDamages",out baseStatus);
             diagnostic="item="+equipped.GetType().Name+
-                ", BaseDamages="+(raw==null?"NULL":raw.ToString());
+                ", BaseDamages="+(raw==null?"NULL":raw.ToString())+
+                " ("+baseStatus+")";
             if(raw is Vector2 baseDamage && baseDamage.y>0f)
             {result=baseDamage;return true;}
 
-            // Fall back to the game's item definition indexed by item Level.
-            // This handles an unavailable computed BaseDamages getter.
-            object definition=GameBridge.Get(equipped,"ItemDefinition");
-            object byLevel=GameBridge.Get(definition,"BaseDamageByLevel");
-            object level=GameBridge.Get(equipped,"Level");
-            if(byLevel is IDictionary levels && level!=null)
+            string definitionStatus,tableStatus,levelStatus;
+            object definition=ReadDamageMember(equipped,"ItemDefinition",
+                out definitionStatus);
+            object byLevel=ReadDamageMember(definition,"BaseDamageByLevel",
+                out tableStatus);
+            object level=ReadDamageMember(equipped,"Level",out levelStatus);
+            diagnostic+=", definition="+definitionStatus+
+                ", damageTable="+tableStatus+
+                ", level="+(level?.ToString()??"NULL")+
+                " ("+levelStatus+")";
+            if(byLevel is IDictionary levels)
             {
-                try
+                // Always print the available levels on first failure so the
+                // actual game version can be diagnosed without guesswork.
+                var keys=new List<string>();
+                foreach(object key in levels.Keys)
                 {
-                    object alternative=levels[level];
-                    if(alternative is Vector2 range && range.y>0f)
-                    {
-                        result=range;
-                        diagnostic+=", definition-level="+level+" -> "+range;
-                        return true;
-                    }
+                    if(keys.Count>=16)break;
+                    keys.Add(key?.ToString()??"NULL");
                 }
-                catch(Exception ex)
-                {diagnostic+=", level lookup error="+ex.GetBaseException().Message;}
+                diagnostic+=", availableLevels=["+string.Join(",",keys.ToArray())+"]";
+                if(level!=null)
+                {
+                    try
+                    {
+                        if(levels.Contains(level))
+                        {
+                            object alternative=levels[level];
+                            if(alternative is Vector2 range && range.y>0f)
+                            {
+                                result=range;
+                                diagnostic+=", definition-level="+level+" -> "+range;
+                                return true;
+                            }
+                            diagnostic+=", table value="+(alternative?.ToString()??"NULL");
+                        }
+                        else diagnostic+=", requested level absent";
+                    }
+                    catch(Exception ex)
+                    {diagnostic+=", level lookup error="+
+                        ex.GetBaseException().Message;}
+                }
             }
-            diagnostic+=", Level="+(level?.ToString()??"NULL");
             return false;
         }
 
@@ -241,8 +306,10 @@ namespace EternalHero.Plugin
                 header+="; "+slotInfo+"; slotType="+(slot?.GetType().Name??"NULL")+
                     "; "+itemDiag;
             }
-            RecordWeaponProbe(id,header+"; fallback=unarmed 18–26");
-            return new Vector2(18f,26f);
+            float fixedBase=Plugin.Instance?.FallbackAttackBaseDamage??150f;
+            RecordWeaponProbe(id,header+"; fallback=fixed "+fixedBase+
+                " (real weapon damage unavailable)");
+            return new Vector2(fixedBase,fixedBase);
         }
 
         // Called after the game's own skill-base range calculation. The
@@ -558,7 +625,9 @@ namespace EternalHero.Plugin
                 "\nБоевые обработчики: BaseDamage="+(itemDamageHookInstalled?"OK":"НЕТ")+
                 ", диапазон="+(rangeDamageHookInstalled?"OK":"НЕТ")+
                 "\nМинимальный базовый урон купленных атак: "+
-                Mathf.RoundToInt((Plugin.Instance?.PurchasedAttackDamageFloor??1.25f)*100f)+"% оружия";
+                Mathf.RoundToInt((Plugin.Instance?.PurchasedAttackDamageFloor??1.25f)*100f)+"% оружия"+
+                "\nЗапасная база при ошибке чтения: "+
+                Mathf.RoundToInt(Plugin.Instance?.FallbackAttackBaseDamage??150f);
         }
     }
 }
