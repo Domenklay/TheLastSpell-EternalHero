@@ -42,9 +42,13 @@ internal static class Program
                 && low==220 && high==280,
                 "damage floor patch is idempotent");
             low=18;high=26;
-            Check(PurchasedAttackDamageFloor.Apply(ref low,ref high,150f,150f,1.25f)
-                && low==188 && high==188,
-                "fixed 150 weapon-source fallback reaches 188 minimum");
+            Check(PurchasedAttackDamageFloor.Apply(ref low,ref high,150f,200f,1.25f)
+                && low==188 && high==250,
+                "fallback 150 to 200 produces a real 188 to 250 damage range");
+            Check(high>low,"fallback preserves nonzero damage variance");
+            Check(!PurchasedAttackDamageFloor.Apply(ref low,ref high,150f,200f,1.25f)
+                && low==188 && high==250,
+                "range floor remains idempotent");
             var store = new ProfileStore(Path.Combine(temp, "hero.json"));
             var service = new ProgressionService(store.Load());
 

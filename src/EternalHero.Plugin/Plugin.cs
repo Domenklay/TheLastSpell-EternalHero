@@ -14,7 +14,7 @@ namespace EternalHero.Plugin
     public sealed class Plugin : BaseUnityPlugin
     {
         internal const string Id = "domenklay.tls.eternalhero";
-        internal const string Version = "0.24.0";
+        internal const string Version = "0.25.0";
 
         private Harmony harmony;
         private ProfileStore store;
@@ -29,6 +29,7 @@ namespace EternalHero.Plugin
         private ConfigEntry<bool> removeRacePenalties;
         private ConfigEntry<float> purchasedAttackDamageFloorPercent;
         private ConfigEntry<float> fallbackAttackBaseDamage;
+        private ConfigEntry<float> fallbackAttackMaxDamage;
         private object currentHero;
         private string rosterStatus = "Герой не обнаружен; начни новый забег";
         private float nextRosterProbeTime;
@@ -48,7 +49,10 @@ namespace EternalHero.Plugin
         internal float PurchasedAttackDamageFloor =>
             Mathf.Clamp(purchasedAttackDamageFloorPercent?.Value ?? 125f,0f,500f)/100f;
         internal float FallbackAttackBaseDamage =>
-            Mathf.Clamp(fallbackAttackBaseDamage?.Value ?? 150f,1f,10000f);
+            Mathf.Clamp(fallbackAttackBaseDamage?.Value ?? 150f,1f,9999f);
+        internal float FallbackAttackMaxDamage =>
+            Mathf.Max(FallbackAttackBaseDamage+1f,
+                Mathf.Clamp(fallbackAttackMaxDamage?.Value ?? 200f,1f,10000f));
 
         private void Awake()
         {
@@ -70,7 +74,10 @@ namespace EternalHero.Plugin
                     "For purchased active attack skills only: minimum base damage as a percentage of the currently equipped primary-hand weapon's damage. Default 125%; 100 means at least the weapon damage, 0 disables this floor, max 500. Support skills and vanilla weapon attacks are unaffected.");
                 fallbackAttackBaseDamage = Config.Bind("Eternal Hero",
                     "FallbackAttackBaseDamage",150f,
-                    "Base damage to use for purchased attacks ONLY when equipped weapon damage cannot be read. Defaults to 150 (with 125 percent floor this becomes minimum 188). Does not modify any equipped item.");
+                    "Minimum fallback weapon base damage for purchased attacks, used ONLY when equipped weapon damage cannot be read. Default 150; does not modify any equipped item.");
+                fallbackAttackMaxDamage = Config.Bind("Eternal Hero",
+                    "FallbackAttackMaxDamage",200f,
+                    "Maximum fallback weapon base damage for purchased attacks. Default 200, paired with FallbackAttackBaseDamage=150. Must exceed the minimum to preserve damage variance.");
                 editorScale = Config.Bind("Interface", "MenuScale", .78f,
                     "Scale of the character creator window. Allowed range: 0.58 to 1.00.");
                 store = new ProfileStore(Path.Combine(Paths.ConfigPath, "EternalHero", "profile.json"));

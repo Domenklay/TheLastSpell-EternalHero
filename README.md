@@ -2,6 +2,16 @@
 
 [![Build](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml/badge.svg)](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml)
 
+## v0.25 — исправление разброса урона
+
+В v0.24 резервное оружие было представлено диапазоном `150–150`. Поэтому «Картечь» и «Удар молнии» показывали по одному значению урона, хотя атаки стали сильнее.
+
+Теперь при недоступности настоящего `Item.BaseDamages` используется настраиваемый **диапазон 150–200**, а не фиксированное число. При установленной нижней планке 125% базовый результат не меньше **188–250**, до игровых модификаторов. Если реальное оружие успешно считывается, его собственный диапазон имеет приоритет.
+
+В конфигурации `BepInEx/config/domenklay.tls.eternalhero.cfg` сохранён `FallbackAttackBaseDamage = 150`, добавлен `FallbackAttackMaxDamage = 200`, по-прежнему действует `PurchasedAttackDamageFloorPercent = 125`. Покупки, постоянные таланты, эффекты атаки и другие герои не изменяются.
+
+[Установка v0.25](docs/INSTALL.md) · [Сборки](https://github.com/Domenklay/TheLastSpell-EternalHero/actions/workflows/build.yml).
+
 ## v0.24 — безопасная запасная база 150 и диагностика геттеров
 
 Лог v0.23 доказал, что оружие действительно находится в `RightHand[0]` (`Item`, уровень 2), но `BaseDamages` через reflection возвращает `NULL`. Значит, не нужно менять слоты или выдавать фальшивое оружие.

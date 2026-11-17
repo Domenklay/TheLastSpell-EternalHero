@@ -306,10 +306,14 @@ namespace EternalHero.Plugin
                 header+="; "+slotInfo+"; slotType="+(slot?.GetType().Name??"NULL")+
                     "; "+itemDiag;
             }
-            float fixedBase=Plugin.Instance?.FallbackAttackBaseDamage??150f;
-            RecordWeaponProbe(id,header+"; fallback=fixed "+fixedBase+
-                " (real weapon damage unavailable)");
-            return new Vector2(fixedBase,fixedBase);
+            float fallbackMin=Plugin.Instance?.FallbackAttackBaseDamage??150f;
+            float fallbackMax=Plugin.Instance?.FallbackAttackMaxDamage??200f;
+            // A nonzero span is essential: v0.24 used (150,150), which
+            // collapsed every purchased skill tooltip to one damage value.
+            fallbackMax=Mathf.Max(fallbackMin+1f,fallbackMax);
+            RecordWeaponProbe(id,header+"; fallback=range "+
+                fallbackMin+"–"+fallbackMax+" (real weapon damage unavailable)");
+            return new Vector2(fallbackMin,fallbackMax);
         }
 
         // Called after the game's own skill-base range calculation. The
@@ -627,7 +631,8 @@ namespace EternalHero.Plugin
                 "\nМинимальный базовый урон купленных атак: "+
                 Mathf.RoundToInt((Plugin.Instance?.PurchasedAttackDamageFloor??1.25f)*100f)+"% оружия"+
                 "\nЗапасная база при ошибке чтения: "+
-                Mathf.RoundToInt(Plugin.Instance?.FallbackAttackBaseDamage??150f);
+                Mathf.RoundToInt(Plugin.Instance?.FallbackAttackBaseDamage??150f)+"–"+
+                Mathf.RoundToInt(Plugin.Instance?.FallbackAttackMaxDamage??200f);
         }
     }
 }
