@@ -24,8 +24,8 @@ namespace EternalHero.Plugin
         }
 
         private static object lastBar,lastHero;
-        private static readonly HashSet<string> WarnedEmptyWeaponSlot=
-            new HashSet<string>(StringComparer.Ordinal);
+        private static string lastWeaponProbe="";
+        private static int weaponProbeLogCount;
         private static ManualLogSource combatLog;
         private static bool itemDamageHookInstalled,rangeDamageHookInstalled;
         private static readonly HashSet<string> LoggedDamageFallback=
@@ -104,49 +104,144 @@ namespace EternalHero.Plugin
                  !profile.DisabledVanillaSkills.Contains(id));
         }
 
-        // RightHand is the FIRST weapon slot in the currently active set.
-        // The Last Spell stores weapon sets at indices 0 and 1; each slot
-        // contains an ItemSlot.Item with its real Level-adjusted BaseDamages.
-        // Never cache damage: swapping weapon sets or changing equipment must
-        // immediately update previews and attacks.
+        // The game's equipment model is a Dictionary<E_ItemSlotId,
+        // List<EquipmentSlot>>, but work across versions that expose a
+        // different IDictionary / generic IEnumerable of key-value pairs.
+        // RightHand=1, LeftHand=2 in the game's E_ItemSlotId enum.
+        private static IEnumerable<KeyValuePair<object,object>> EquipmentPairs(object slots)
+        {
+            if(slots is IDictionary dict)
+            {
+                foreach(DictionaryEntry pair in dict)
+                    yield return new KeyValuePair<object,object>(pair.Key,pair.Value);
+            }
+            else if(slots is IEnumerable sequence)
+            {
+                foreach(object pair in sequence)
+                {
+                    object key=GameBridge.Get(pair,"Key");
+                    if(key!=null)
+                        yield return new KeyValuePair<object,object>(
+                            key,GameBridge.Get(pair,"Value"));
+                }
+            }
+        }
+
+        private static bool IsHandSlot(object key,string expected,int number)
+        {
+            if(key==null)return false;
+            if(string.Equals(key.ToString(),expected,StringComparison.OrdinalIgnoreCase))
+                return true;
+            try{return (key is Enum || key is int || key is byte) &&
+                Convert.ToInt64(key)==number;}
+            catch{return false;}
+        }
+
+        private static List<object> ReadSlots(object value)
+        {
+            if(value is IList list)
+                return list.Cast<object>().ToList();
+            if(value is IEnumerable enumerable)
+                return enumerable.Cast<object>().Take(16).ToList();
+            return new List<object>();
+        }
+
+        private static bool TryItemDamage(object equipped,out Vector2 result,
+            out string diagnostic)
+        {
+            result=Vector2.zero;
+            if(equipped==null){diagnostic="item=NULL";return false;}
+            object raw=GameBridge.Get(equipped,"BaseDamages");
+            diagnostic="item="+equipped.GetType().Name+
+                ", BaseDamages="+(raw==null?"NULL":raw.ToString());
+            if(raw is Vector2 baseDamage && baseDamage.y>0f)
+            {result=baseDamage;return true;}
+
+            // Fall back to the game's item definition indexed by item Level.
+            // This handles an unavailable computed BaseDamages getter.
+            object definition=GameBridge.Get(equipped,"ItemDefinition");
+            object byLevel=GameBridge.Get(definition,"BaseDamageByLevel");
+            object level=GameBridge.Get(equipped,"Level");
+            if(byLevel is IDictionary levels && level!=null)
+            {
+                try
+                {
+                    object alternative=levels[level];
+                    if(alternative is Vector2 range && range.y>0f)
+                    {
+                        result=range;
+                        diagnostic+=", definition-level="+level+" -> "+range;
+                        return true;
+                    }
+                }
+                catch(Exception ex)
+                {diagnostic+=", level lookup error="+ex.GetBaseException().Message;}
+            }
+            diagnostic+=", Level="+(level?.ToString()??"NULL");
+            return false;
+        }
+
+        private static void RecordWeaponProbe(string id,string diagnosis)
+        {
+            string record=id+": "+diagnosis;
+            if(record==lastWeaponProbe)return;
+            lastWeaponProbe=record;
+            if(weaponProbeLogCount++<96)
+                combatLog?.LogInfo("Eternal Hero equipment probe: "+record);
+        }
+
+        // Read the weapon anew every time: changes to equipment or the
+        // active set must affect damage without caching or reloading.
         private static Vector2 GetSourceDamage(string id)
         {
             object hero=Plugin.Instance?.CurrentHero;
-            var slots=GameBridge.Get(hero,"EquipmentSlots") as IDictionary;
-            if(slots!=null)
+            object source=GameBridge.Get(hero,"EquipmentSlots");
+            object active=GameBridge.Get(hero,"EquippedWeaponSetIndex");
+            int setIndex=0;
+            try{setIndex=Convert.ToInt32(active??0);}
+            catch{ }
+
+            string header="hero="+(hero?.GetType().Name??"NULL")+
+                ", EquipmentSlots="+(source?.GetType().Name??"NULL")+
+                ", activeSet="+setIndex;
+            var allPairs=EquipmentPairs(source).Take(32).ToList();
+            string names=string.Join(",",
+                allPairs.Select(pair=>pair.Key?.ToString()??"NULL").ToArray());
+            header+=", keys=["+names+"]";
+
+            // Prefer the primary hand. If genuinely empty, permit a weapon
+            // in the other active hand, but never a weapon in an inactive set
+            // or another hero's inventory.
+            foreach(var hand in new[]{new{Key="RightHand",Code=1},
+                                       new{Key="LeftHand",Code=2}})
             {
-                foreach(DictionaryEntry slotGroup in slots)
+                var pair=allPairs.FirstOrDefault(p=>
+                    IsHandSlot(p.Key,hand.Key,hand.Code));
+                if(pair.Key==null)continue;
+                var handSlots=ReadSlots(pair.Value);
+                string slotInfo=hand.Key+" count="+handSlots.Count;
+                if(setIndex<0||setIndex>=handSlots.Count)
                 {
-                    if(!string.Equals(slotGroup.Key?.ToString(),"RightHand",
-                        StringComparison.Ordinal))continue;
-                    var handSlots=slotGroup.Value as IList;
-                    int setIndex=0;
-                    try
-                    {
-                        setIndex=Convert.ToInt32(
-                            GameBridge.Get(hero,"EquippedWeaponSetIndex")??0);
-                    }
-                    catch{ }
-                    if(handSlots!=null && setIndex>=0 && setIndex<handSlots.Count)
-                    {
-                        object equipped=GameBridge.Get(handSlots[setIndex],"Item");
-                        object raw=GameBridge.Get(equipped,"BaseDamages");
-                        if(raw is Vector2 baseDamage && baseDamage.y>0f)
-                        {
-                            string key=id+":"+setIndex+":"+baseDamage.x+":"+baseDamage.y;
-                            if(LoggedDamageSources.Add(key))
-                                combatLog?.LogInfo("Eternal Hero first weapon slot: "+
-                                    id+" from active weapon set "+setIndex+
-                                    ", base damage "+baseDamage.x+"–"+baseDamage.y);
-                            return baseDamage;
-                        }
-                    }
-                    break;
+                    header+="; "+slotInfo+" active index out of range";
+                    continue;
                 }
+                object slot=handSlots[setIndex];
+                object equipped=GameBridge.Get(slot,"Item");
+                if(TryItemDamage(equipped,out Vector2 baseDamage,out string itemDiag))
+                {
+                    RecordWeaponProbe(id,header+"; "+slotInfo+
+                        "; "+itemDiag+"; RESOLVED="+baseDamage);
+                    string key=id+":"+setIndex+":"+hand.Key+":"+baseDamage.x+":"+baseDamage.y;
+                    if(LoggedDamageSources.Count<256&&LoggedDamageSources.Add(key))
+                        combatLog?.LogInfo("Eternal Hero first weapon slot: "+
+                            id+" from "+hand.Key+" active weapon set "+setIndex+
+                            ", base damage "+baseDamage.x+"–"+baseDamage.y);
+                    return baseDamage;
+                }
+                header+="; "+slotInfo+"; slotType="+(slot?.GetType().Name??"NULL")+
+                    "; "+itemDiag;
             }
-            if(WarnedEmptyWeaponSlot.Add(id))
-                combatLog?.LogInfo("Eternal Hero: first weapon slot empty "+
-                    "or has no base damage for "+id+"; using unarmed 18–26");
+            RecordWeaponProbe(id,header+"; fallback=unarmed 18–26");
             return new Vector2(18f,26f);
         }
 
